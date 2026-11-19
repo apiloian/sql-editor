@@ -40,9 +40,9 @@ export default function ResultsChart({ result, kind, theme, axes, onAxesChange }
   const [zoomedChartKey, setZoomedChartKey] = useState<string | null>(null)
   const fields = useMemo(() => chartFields(result), [result])
   const chart = useMemo(() => prepareChart(result.rows, fields, axes, kind), [result.rows, fields, axes, kind])
-  const { category, measure, splitField, splitFields, numericFields, measureTitle, message, validPoints, missingCount, isSplit, categories, measures } = chart
+  const { category, measure, numericFields, measureTitle, message, validPoints, missingCount, isSplit, categories, measures } = chart
   const isPie = kind === 'pie'
-  const chartKey = JSON.stringify([kind, category?.index, splitField?.index])
+  const chartKey = JSON.stringify([kind, category?.index])
   const canZoom = !isPie && categories.length > 1
   const colors = themes[theme].global.color
   const palette = colors.chart.default
