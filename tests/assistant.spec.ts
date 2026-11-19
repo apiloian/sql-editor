@@ -8,7 +8,7 @@ test.beforeEach(async ({ page }) => {
 
 test('assistant SQL is one undoable edit with keyboard redo', async ({ page }) => {
   let original = ''
-  await page.route('**/assistant', async (route) => {
+  await page.route('https://api.example.test/editor-api/assistant', async (route) => {
     const request = route.request().postDataJSON()
     expect(request.action).toBe('generate')
     expect(request.prompt).toBe('Count trips')
@@ -34,7 +34,7 @@ test('a late assistant response cannot overwrite a manual edit', async ({ page }
   const waiting = new Promise<void>((resolve) => { finish = resolve })
   let started: (() => void) | undefined
   const requestStarted = new Promise<void>((resolve) => { started = resolve })
-  await page.route('**/assistant', async (route) => {
+  await page.route('https://api.example.test/editor-api/assistant', async (route) => {
     started?.()
     await waiting
     await route.fulfill({ json: { sql: 'SELECT 999;' } })

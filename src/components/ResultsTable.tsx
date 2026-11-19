@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useMemo, useRef, useState } from 'react'
 import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, Table2 } from 'lucide-react'
 import { DEFAULT_PAGE_SIZE, DEFAULT_RESULT_LIMIT, failureMessage, formatCell } from '../lib/query'
 import type { QueryState, RowResult, StatementOutcome } from '../lib/query'
-import { resultViews } from '../lib/chart'
+import { chartFields, resultViews } from '../lib/chart'
 import type { ChartAxes, ResultsView } from '../lib/chart'
 import type { Theme } from '../lib/theme'
 
@@ -101,18 +101,23 @@ function RowsView({ result, pageSize, onPageSize, view, theme, axes, onAxesChang
   const extraWidth = Math.max(0, availableWidth - baseWidth) / Math.max(1, autoColumns || columns.length)
   const widths = customWidths.map(width => (width ?? COLUMN_WIDTH.initial) + (width === null || !autoColumns ? extraWidth : 0))
   const maxColumnWidth = Math.max(COLUMN_WIDTH.max, availableWidth)
+  const showChart = view !== 'table'
   const chartData = useMemo(() => {
-    if (view === 'table') return null
+    if (!showChart) return null
     const labels = new Set<string>()
-    const chartColumns = columns.map(({ name }) => {
+    const chartColumns = columns.map(({ name, type }) => {
       let label = name
       let suffix = 2
       while (labels.has(label)) label = `${name} (${suffix++})`
       labels.add(label)
-      return label
+      return { name: label, type }
     })
-    return { columns: chartColumns, rows: rows.map(row => Object.fromEntries(chartColumns.map((name, index) => [name, row[index]]))) }
-  }, [columns, rows, view])
+    const chartRows = rows.map(row => Object.fromEntries(chartColumns.map(({ name }, index) => [name, row[index]])))
+    return { columns: chartColumns.map(({ name }) => name), rows: chartRows, ...chartFields(chartColumns, chartRows) }
+  }, [columns, rows, showChart])
+  const xColumn = chartData?.columns.includes(axes.xColumn) ? axes.xColumn : chartData?.category ?? ''
+  const yColumn = chartData?.numericColumns.includes(axes.yColumn) ? axes.yColumn
+    : chartData?.measures.find((name) => name !== xColumn) ?? chartData?.measures[0] ?? ''
 
   const lastPage = Math.max(1, Math.ceil(rows.length / pageSize))
   const rowOffset = (page - 1) * pageSize
@@ -128,7 +133,8 @@ function RowsView({ result, pageSize, onPageSize, view, theme, axes, onAxesChang
     {view !== 'table' && chartData ? (
       <div className="results-content chart-content">
         <Suspense fallback={<div className="empty-state"><p>Loading chart…</p></div>}>
-          <ResultsChart {...chartData} kind={view} theme={theme} axes={axes} onAxesChange={onAxesChange} />
+          <ResultsChart columns={chartData.columns} rows={chartData.rows} numericColumns={chartData.numericColumns}
+            kind={view} theme={theme} axes={{ xColumn, yColumn }} onAxesChange={onAxesChange} />
         </Suspense>
       </div>
     ) : <>

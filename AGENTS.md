@@ -13,9 +13,11 @@ This directory contains the React client and the product specifications. The par
 | Working directory | Commands | Purpose |
 | --- | --- | --- |
 | Parent directory | `docker compose up -d`, then `npm start` | Start ClickHouse and the Express API for live checks. |
-| This directory | `npm run dev` | Start the editor. Its [Vite proxy](vite.config.ts) forwards API requests to Express. |
+| This directory | `npm run dev` | Start the editor. Set `VITE_APP_API_BASE` in `.env.local` to the browser-accessible API base URL. |
 | This directory | `npm test -- tests/pagination.spec.ts` | Run a focused Playwright suite. Substitute the suite for the feature being changed. |
 | This directory | `npm run lint` and `npm run build` | Check the client and its production build. |
 | Parent directory | `npm test` | Run the server package’s tests. |
 
-Playwright starts its own Vite instance. Check whether a browser test mocks the API before treating it as evidence of database behavior. For changes that affect writes or cancellation, verify the outcome against a disposable ClickHouse table or query.
+Set `VITE_APP_API_BASE` in Vercel before building the client. Use the base URL up to any shared path prefix, such as `https://api.example.com/editor`. For a different origin, the API host must allow the frontend origin via CORS, including preflight requests for JSON and CSV uploads.
+
+Playwright starts its own Vite instance with a test API base URL. Check whether a browser test mocks the API before treating it as evidence of database behavior. For changes that affect writes or cancellation, verify the outcome against a disposable ClickHouse table or query.

@@ -1,11 +1,53 @@
-# 5. Visualize results
+# 5. Visualize query results
 
-Build on the returned rows and column information from stage 1. Start with the chart configuration helper and results chart component.
+After running SQL, a user can switch from inspecting individual rows to answering a question about those same rows. They might compare revenue across products, follow registrations over time, or see how much each category contributes to a total. They should be able to tell which columns they are looking at, which rows the chart represents, and how to inspect a crowded chart. [Product requirements](../product-requirements.md#query-result-charts)
 
-- [ ] Render bar, area, line, and pie charts for suitable results. Share the selected statement’s full returned dataset with the chart and preserve its truncation notice. Keep paging controls in the table.
-- [ ] Review example datasets to choose the controls each chart needs. Evaluate number formatting, legend placement, and category colors during this stage.
-- [ ] Match each pie leader line to its slice. Hovering emphasizes the slice, connector, and label together. Support zoom and reset on bar charts.
+## Where the product starts
 
-**Tests.** Use 800 returned rows with 50 visible in the table. Verify that all 800 reach the chart and paging makes no chart change or query request. Cover each chart type, an empty or unsuitable result, truncation, bar zoom/reset, and pie hover followed by pointer exit.
+The results panel already offers Table, Bar, Area, Line, and Pie. It passes the selected statement’s full returned dataset to ECharts, keeps pagination in the table, and displays the truncation notice in both views. Setup currently consists of two column selectors. The chart uses eight theme colors, gives every pie connector the same muted color, and has no bar zoom or explicit pie hover treatment that fades the other slices and labels together. [Results panel](../../src/components/ResultsTable.tsx) · [Chart component](../../src/components/ResultsChart.tsx) · [Value handling](../../src/lib/chart.ts)
 
-**Review.** Switch between table and chart on the same run. Compare pie labels and connectors for several categories, then zoom into a bar chart and restore its full range.
+## The first implementation
+
+| What the user wants to do | Expected experience |
+| --- | --- |
+| Compare categories | Choose a **bar chart**, identify the category and numeric measure, and inspect their values. On a crowded chart, zoom into a smaller range of bars and restore the full range. Zoom changes only the visible range. |
+| See a trend | Choose **line** or **area** for an ordered result such as registrations by month. Both show the values in query order. The area view fills the region under the line. Missing measures remain visible as gaps. |
+| Understand a share | Choose **pie** for a category and a nonnegative measure with at least one positive value. Give every slice’s leader line the color of its slice. As in the reference image, hovering over a slice keeps the slice, line, and label prominent, fades the others together, and shows the category and value. Moving to a second slice transfers focus. Moving off the pie restores the full view. |
+| Configure or correct a chart | Make the choice specific to the chart. For example, a user comparing products should recognize which field identifies the product and which measures revenue. For a pie, they should recognize which field names a slice and which determines its size. Let them inspect and change those choices using columns from the selected result. If the fields are unsuitable, explain which kind of value is needed and keep the table available. |
+| Distinguish categories | Use a small palette with enough distinct colors to avoid unnecessary repetition. Keep the mark, its connector, and its tooltip marker consistent. Check readability in both editor themes and with enough categories for colors to repeat. Labels and tooltips should still identify a category when a color is reused. |
+
+For the first pass, try suggesting a category and measure when column names and types make the choice straightforward. Allow the user to override them. This is a design to evaluate with real results. The layout of the controls and the final defaults can be refined after using the first implementation.
+
+The first pass uses **Category** and **Measure** for bar, line, and area, and **Slice label** and **Slice size** for pie. Axis titles use the selected field names with the first letter capitalized. The bar slider adjusts the visible category range, and **Reset zoom** restores the full range. Pie cycles through ten theme colors in result order.
+
+## What data the chart represents
+
+- The server supplies the existing statement outcome, including ordered columns, types, rows, and truncation status. The frontend configures and renders the chart from that outcome. Switching view, changing a field, hovering, or zooming requires zero additional query executions.
+- A chart uses all rows returned for the selected statement. If the table shows 50 of 800 returned rows, the chart receives 800. If the default limit truncated the result, show the same notice in the chart. Honor larger explicit SQL limits. Counts reported as rows read by ClickHouse describe database work.
+- SQL controls sorting and aggregation. For example, to plot total revenue per product, use the result of a query that groups by product. Two returned orders for the same product remain two observations unless the SQL combines them.
+- For an empty result, a command acknowledgment, or a failed statement, retain the corresponding Stage 1 outcome. Switching script statements must never leave a previous statement’s data visible as the new chart. For missing or unplottable values, preserve the existing explanation of gaps or omitted pie slices.
+- Manual chart setup works independently of the assistant. The later assistant stage can prepare a view for particular SQL and populate it after the user runs that SQL. [Stage 6](06-assistant.md)
+
+## Acceptance scenarios for implementation
+
+| Scenario | What to verify |
+| --- | --- |
+| Page through an 800-row result and switch to a chart | A value found only on the last page is represented from either page. Changing the page, view, or field makes no additional query request. Keep the existing browser coverage for this behavior and for the truncation notice. |
+| Compare two measures for the same categories | Return a product name, order count, and revenue. Switch the measure from count to revenue and check the displayed values against the table. Switch to a statement with different columns and verify its chart uses valid fields from that result. |
+| Inspect ordered monthly data | Plot the same result as line and area. Verify order, values, the area fill, and a gap for a missing measure. |
+| Follow a pie label | Use several distinct categories. Hover one slice, then another, then leave the chart. Check connector colors, label emphasis, the tooltip value, and restoration in both themes. |
+| Inspect a dense bar chart | Zoom to a subset of categories, inspect a value, and reset. Verify the original range and values return and the result row count stays the same. |
+| Inspect an unsuitable result | Try text-only data, an empty SELECT, and negative or all-zero pie values. Verify that the user can see the result or a useful explanation and return to the table. |
+
+Write automated tests alongside implementation. The existing [browser result tests](../../tests/pagination.spec.ts) cover full-result chart scope and truncation. Use the running editor for visual review of hover emphasis, repeated colors, label legibility, and zoom.
+
+## Review after the first implementation
+
+Use three examples in the running app: revenue by product for bar zoom, registrations by month for line and area, and a product mix for pie hover. Review them once with a few categories and again with crowded labels. Then decide:
+
+- Which setup controls or suggestions genuinely help, and where should the view selector live?
+- Would number formatting or legend placement solve a visible problem in these examples?
+- How many colors are useful before reuse, and how strongly should other slices fade?
+- Which zoom gesture or control feels natural on bar charts, and would line or area charts benefit from it too?
+
+These are follow-up design choices. The four chart types, shared result scope, pie interaction, and bar zoom are ready to implement.

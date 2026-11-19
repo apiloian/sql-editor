@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { Upload } from 'lucide-react'
 
+import { fetchApi } from '../lib/api'
+
 type Destination = { database: string; name: string }
 type Selection = { table: Destination | null; file: File | null }
 type UploadSelection = { table: Destination; file: File }
@@ -185,7 +187,7 @@ export function CsvImportDialog({ tables, onClose }: { tables: Destination[]; on
     transition(pending)
     const target = new URLSearchParams({ database: table.database, table: table.name })
     try {
-      const response = await fetch(`/csv-import/verify?${target}`, {
+      const response = await fetchApi(`/csv-import/verify?${target}`, {
         method: 'POST',
         body: file,
         headers: { 'Content-Type': 'text/csv' },
@@ -211,7 +213,7 @@ export function CsvImportDialog({ tables, onClose }: { tables: Destination[]; on
     const pending = { kind: 'importing' as const, importId, table, file }
     transition(pending)
     try {
-      const response = await fetch(`/csv-import/${encodeURIComponent(importId)}/confirm`, { method: 'POST' })
+      const response = await fetchApi(`/csv-import/${encodeURIComponent(importId)}/confirm`, { method: 'POST' })
       const payload: unknown = await response.json().catch(() => null)
       const result = parseImportResult(payload, response.ok)
       if (current.current === pending) {

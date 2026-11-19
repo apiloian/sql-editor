@@ -6,6 +6,7 @@ import type { Page, Route } from '@playwright/test'
 const title = 'Insert data from a file'
 const defaultTable = 'default.orders'
 const archiveTable = 'archive.orders'
+const apiBase = 'https://api.example.test/editor-api'
 
 const csv = (name: string, records: string[]) => ({
   name,
@@ -14,7 +15,7 @@ const csv = (name: string, records: string[]) => ({
 })
 
 async function openImport(page: Page) {
-  await page.route('**/query', async (route) => {
+  await page.route(`${apiBase}/query`, async (route) => {
     const body: unknown = route.request().postDataJSON()
     if (!body || typeof body !== 'object' || !('query' in body) || typeof body.query !== 'string') {
       throw new Error('Expected a schema query.')
@@ -39,11 +40,11 @@ async function openImport(page: Page) {
   })
 
   const verifications: Route[] = []
-  await page.route((url) => url.pathname === '/csv-import/verify', (route) => {
+  await page.route((url) => `${url.origin}${url.pathname}` === `${apiBase}/csv-import/verify`, (route) => {
     verifications.push(route)
   })
   const confirmations: Route[] = []
-  await page.route((url) => /^\/csv-import\/[^/]+\/confirm$/.test(url.pathname), (route) => {
+  await page.route(`${apiBase}/csv-import/*/confirm`, (route) => {
     confirmations.push(route)
   })
 
@@ -96,7 +97,7 @@ test('checks the selected CSV and waits for confirmation before reporting comple
   await importButton.click()
   await expect.poll(() => confirmations.length).toBe(1)
   expect(confirmations[0].request().method()).toBe('POST')
-  expect(new URL(confirmations[0].request().url()).pathname).toBe('/csv-import/twenty/confirm')
+  expect(confirmations[0].request().url()).toBe(`${apiBase}/csv-import/twenty/confirm`)
   await expect(importButton).toBeDisabled()
   await expect(dialog.getByText(/importing into default\.orders/i)).toBeVisible()
   const completion = dialog.getByText(/(?:inserted|imported) 20 rows/i)
@@ -111,7 +112,7 @@ test('a dropped replacement CSV and a changed destination require their own verd
     const fetchFromBrowser = window.fetch.bind(window)
     window.fetch = async (input, init) => {
       const url = input instanceof Request ? input.url : input
-      if (new URL(url, window.location.href).pathname !== '/csv-import/verify') {
+      if (new URL(url, window.location.href).pathname !== '/editor-api/csv-import/verify') {
         return fetchFromBrowser(input, init)
       }
 

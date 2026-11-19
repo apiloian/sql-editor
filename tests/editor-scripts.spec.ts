@@ -185,10 +185,10 @@ test('toggling existing line comments twice preserves their exact spacing and is
   await renderedLines(page).toEqual(original)
 })
 
-test('double-click opens the editor menu beside the pointer after scrolling', async ({ page }) => {
+test('right-click opens a compact editor menu beside the pointer above results after scrolling', async ({ page }) => {
   const first = 'SELECT 101'
   const last = 'SELECT 909 FROM numbers(1)'
-  const selection = 'SELECT 909'
+  const selection = 'SELECT'
   const intermediate = Array.from({ length: 55 }, (_, index) => `SELECT ${index + 1000};`).join('\n')
   const { input, modifier, requests, cell, moveToLine } = await openEditor(page, {
     [first]: rows(101), [last]: rows(909), [selection]: rows(910),
@@ -214,10 +214,11 @@ test('double-click opens the editor menu beside the pointer after scrolling', as
   if (!targetBox || !viewport) throw new Error('Expected the scrolled line and viewport to have visible bounds.')
   const menu = page.getByRole('menu')
   async function openMenuNear(pointer: { x: number; y: number }) {
-    await page.mouse.dblclick(pointer.x, pointer.y)
+    await page.mouse.click(pointer.x, pointer.y, { button: 'right' })
     await expect(menu).toBeVisible()
     const box = await menu.boundingBox()
     if (!box || !viewport) throw new Error('Expected the menu and viewport to have visible bounds.')
+    expect(box.width).toBeLessThan(230)
     expect(box.x).toBeGreaterThanOrEqual(0)
     expect(box.y).toBeGreaterThanOrEqual(0)
     expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1)
@@ -231,8 +232,10 @@ test('double-click opens the editor menu beside the pointer after scrolling', as
   expect(requests).toEqual([first, last])
 
   await moveToLine(last)
-  for (let index = 0; index < selection.length; index++) await page.keyboard.press('Shift+ArrowRight')
-  await target.getByText('SELECT', { exact: true }).dblclick()
+  const word = target.getByText('SELECT', { exact: true })
+  await word.dblclick()
+  await expect(menu).not.toBeVisible()
+  await word.click({ button: 'right' })
   await menu.getByRole('menuitem', { name: /^Run\b/ }).click({ delay: 125 })
   await expect(cell(910)).toBeVisible()
   expect(requests).toEqual([first, last, selection])

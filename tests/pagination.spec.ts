@@ -33,7 +33,7 @@ async function runSql(page: Page, editorSql: string, outcomes: Record<string, Qu
   }, followupSql ? [editorSql, followupSql] : [editorSql])
 
   const requests: string[] = []
-  await page.route('**/query', (route) => {
+  await page.route('https://api.example.test/editor-api/query', (route) => {
     const body: unknown = route.request().postDataJSON()
     if (!body || typeof body !== 'object' || !('query' in body) || typeof body.query !== 'string') {
       throw new Error('Expected a query string in the request body.')
@@ -143,8 +143,8 @@ test('charts all 800 rows regardless of the table page', async ({ page }) => {
   const chartDataNote = results.getByRole('status').filter({ hasText: /\b799 values are missing\b/ })
   const pie = results.getByRole('button', { name: 'Pie', exact: true })
   await pie.click()
-  await results.getByRole('combobox', { name: 'Category' }).selectOption('number')
-  await results.getByRole('combobox', { name: 'Value' }).selectOption('metric')
+  await results.getByRole('combobox', { name: 'Slice label' }).selectOption('number')
+  await results.getByRole('combobox', { name: 'Slice size' }).selectOption('metric')
   await expect(chart).toBeVisible()
   await expect(chartDataNote).toBeVisible()
   await expect(results.getByRole('combobox', { name: 'Results per page' })).toHaveCount(0)
@@ -271,4 +271,208 @@ test('shows an unconfirmed write outcome without retrying it', async ({ page }) 
   await expect(results.getByText(insertSql, { exact: true })).toBeVisible()
   await expect(run).toBeEnabled()
   expect(requests).toEqual([insertSql])
+})
+
+async function renderedChart(page: Page) {
+  await expect(page.locator('.chart-stage canvas').first()).toBeVisible()
+  return page.evaluate(async () => {
+    const host = document.querySelector<HTMLElement>('.chart-stage [_echarts_instance_]')
+    const resource = performance.getEntriesByType('resource').find(({ name }) => /\/echarts_core\.js(?:\?|$)/.test(name))
+    if (!host || !resource) throw new Error('Expected an ECharts canvas in the results.')
+    const { getInstanceByDom } = await import(resource.name)
+    const chart = getInstanceByDom(host)
+    if (!chart) throw new Error('Expected the chart to be mounted.')
+    const series = chart.getModel().getSeriesByIndex(0)
+    const data = series.getData()
+    const bounds = host.getBoundingClientRect()
+    const elements = chart.getZr().storage.getDisplayList()
+    return {
+      text: elements.flatMap((element: { style?: { text?: string } }) => element.style?.text ?? []),
+      area: Boolean(series.option.areaStyle),
+      category: (chart.getOption().xAxis?.[0]?.data ?? []) as string[],
+      values: data.mapArray(series.subType === 'pie' ? 'value' : 'y', (value: number) => Number.isNaN(value) ? null : value) as (number | null)[],
+      slices: series.subType === 'pie' ? Array.from({ length: data.count() }, (_, index) => {
+        const slice = data.getItemGraphicEl(index)
+        const label = slice.getTextContent()
+        const line = slice.getTextGuideLine()
+        const shape = slice.shape
+        const angle = (shape.startAngle + shape.endAngle) / 2
+        return {
+          fill: slice.style.fill as string,
+          stroke: line.style.stroke as string,
+          opacity: Number(slice.style.opacity ?? 1),
+          labelOpacity: Number(label.style.opacity ?? 1),
+          lineOpacity: Number(line.style.opacity ?? 1),
+          point: {
+            x: bounds.x + shape.cx + Math.cos(angle) * shape.r * 0.65,
+            y: bounds.y + shape.cy + Math.sin(angle) * shape.r * 0.65,
+          },
+        }
+      }) : [],
+      handles: elements.filter((element: { cursor: string; draggable: boolean }) => element.draggable && element.cursor === 'ew-resize')
+        .map((element: { getBoundingRect(): { x: number; y: number; width: number; height: number }; transformCoordToGlobal(x: number, y: number): number[] }) => {
+          const { x, y, width, height } = element.getBoundingRect()
+          const [localX, localY] = element.transformCoordToGlobal(x + width / 2, y + height / 2)
+          return { x: bounds.x + localX, y: bounds.y + localY }
+        }) as { x: number; y: number }[],
+      firstBar: series.subType === 'bar' && data.count() ? (
+        () => {
+          const bar = data.getItemGraphicEl(0).shape
+          return { x: bounds.x + bar.x + bar.width / 2, y: bounds.y + bar.y + bar.height / 2 }
+        }
+      )() : null,
+    }
+  })
+}
+
+test('suggests fields, capitalizes axis titles, and changes measures and statements locally', async ({ page }) => {
+  const first = 'SELECT product, orders, revenue FROM products'
+  const second = 'SELECT month, registrations FROM accounts'
+  const { results, requests } = await runSql(page, first + ';\n' + second, {
+    [first]: rowsOutcome([
+      { name: 'product', type: 'String' }, { name: 'orders', type: 'UInt32' }, { name: 'revenue', type: 'Decimal(10, 2)' },
+    ], [['Desk', 3, '125.25'], ['Lamp', 7, '89.50']]),
+    [second]: rowsOutcome([{ name: 'month', type: 'String' }, { name: 'registrations', type: 'UInt32' }], [['May', 19]]),
+  })
+  const statement = results.getByRole('combobox', { name: 'Statement outcome' })
+  await statement.selectOption('0')
+  await results.getByRole('button', { name: 'Bar', exact: true }).click()
+  const category = results.getByRole('combobox', { name: 'Category' })
+  await expect(category).toHaveValue('product')
+  const measure = results.getByRole('combobox', { name: 'Measure' })
+  await expect(measure).toHaveValue('orders')
+  await expect.poll(async () => (await renderedChart(page)).text).toEqual(expect.arrayContaining(['Product', 'Orders']))
+  expect((await renderedChart(page)).values).toEqual([3, 7])
+  await measure.selectOption('revenue')
+  await expect.poll(async () => (await renderedChart(page)).values).toEqual([125.25, 89.5])
+  expect((await renderedChart(page)).text).toContain('Revenue')
+  await category.selectOption('orders')
+  await expect.poll(async () => (await renderedChart(page)).category).toEqual(['3', '7'])
+  await category.selectOption('product')
+  await results.getByRole('button', { name: 'Table', exact: true }).click()
+  await expect(results.getByRole('cell', { name: '125.25' })).toBeVisible()
+  await results.getByRole('button', { name: 'Bar', exact: true }).click()
+  await expect(measure).toHaveValue('revenue')
+  await statement.selectOption('1')
+  await expect(results.getByRole('combobox', { name: 'Category' })).toHaveValue('month')
+  await expect(measure).toHaveValue('registrations')
+  await expect.poll(async () => (await renderedChart(page)).values).toEqual([19])
+  expect(requests).toEqual([first, second])
+})
+
+test('line and area preserve query order and a missing measure', async ({ page }) => {
+  const sql = 'SELECT month, registrations FROM monthly_totals'
+  const { results, requests } = await runSql(page, sql, {
+    [sql]: rowsOutcome([{ name: 'month', type: 'String' }, { name: 'registrations', type: 'Nullable(UInt32)' }], [
+      ['March', 10], ['January', null], ['February', 30], ['April', 25],
+    ]),
+  })
+  for (const view of ['Line', 'Area']) {
+    await results.getByRole('button', { name: view, exact: true }).click()
+    await expect(results.getByRole('status').filter({ hasText: 'These appear as gaps.' })).toBeVisible()
+    await expect.poll(async () => (await renderedChart(page)).area).toBe(view === 'Area')
+    const chart = await renderedChart(page)
+    expect(chart.category).toEqual(['March', 'January', 'February', 'April'])
+    expect(chart.values).toEqual([10, null, 30, 25])
+  }
+  expect(requests).toEqual([sql])
+})
+
+test('pie focuses the slice, matching connector, and label through two hovers in both themes', async ({ page }) => {
+  const sql = 'SELECT product, amount FROM product_mix'
+  const { results, requests } = await runSql(page, sql, {
+    [sql]: rowsOutcome([{ name: 'product', type: 'String' }, { name: 'amount', type: 'UInt32' }], [
+      ['Desk', 40], ['Lamp', 37], ['Chair', 34], ['Shelf', 31], ['Book', 28], ['Pen', 25],
+      ['Tray', 22], ['Vase', 19], ['Mug', 16], ['Clock', 13], ['Mat', 10], ['Cart', 7],
+    ]),
+  })
+  await results.getByRole('button', { name: 'Pie', exact: true }).click()
+  for (const dark of [false, true]) {
+    if (dark) await page.getByRole('button', { name: 'Dark mode' }).click()
+    const initial = await renderedChart(page)
+    expect(initial.slices).toHaveLength(12)
+    expect(new Set(initial.slices.map(({ fill }) => fill)).size).toBeGreaterThanOrEqual(8)
+    for (const slice of initial.slices) expect(slice.stroke).toBe(slice.fill)
+    for (const [index, name, value] of [[0, 'Desk', '40'], [1, 'Lamp', '37']] as const) {
+      const { point } = initial.slices[index]
+      await page.mouse.move(point.x, point.y)
+      await expect.poll(async () => {
+        const chart = await renderedChart(page)
+        const focus = chart.slices[index]
+        const other = chart.slices[1 - index]
+        return focus.opacity === 1 && focus.labelOpacity === 1 && focus.lineOpacity === 1
+          && other.opacity < 0.5 && other.labelOpacity < 0.5 && other.lineOpacity < 0.5
+      }).toBe(true)
+      const tooltipRow = page.locator('.chart-stage').getByText(name, { exact: true }).locator('..')
+      await expect(tooltipRow.getByText(value, { exact: true })).toBeVisible()
+      const marker = tooltipRow.locator('span[style*="background-color"]')
+      expect(await marker.evaluate((element, fill) => {
+        const swatch = document.createElement('span')
+        swatch.style.backgroundColor = fill
+        return getComputedStyle(element).backgroundColor === swatch.style.backgroundColor
+      }, initial.slices[index].fill)).toBe(true)
+    }
+    await results.getByRole('heading', { name: 'Query results' }).hover()
+    await expect.poll(async () => (await renderedChart(page)).slices.every(
+      ({ opacity, labelOpacity, lineOpacity }) => opacity === 1 && labelOpacity === 1 && lineOpacity === 1,
+    )).toBe(true)
+  }
+  expect(requests).toEqual([sql])
+})
+
+test('bar slider zooms the visible range and resets without changing rows', async ({ page }) => {
+  await page.setViewportSize({ width: 1360, height: 1050 })
+  const sql = 'SELECT product, revenue FROM dense_bars'
+  const rows = Array.from({ length: 160 }, (_, i) => ['Product ' + (i + 1), 301 + i])
+  const { results, requests } = await runSql(page, sql, {
+    [sql]: rowsOutcome([{ name: 'product', type: 'String' }, { name: 'revenue', type: 'UInt32' }], rows),
+  })
+  await results.getByRole('button', { name: 'Bar', exact: true }).click()
+  const reset = results.getByRole('button', { name: 'Reset zoom' })
+  const before = await renderedChart(page)
+  expect(before.values).toHaveLength(160)
+  expect(before.handles).toHaveLength(2)
+  const [left, right] = [...before.handles].sort((a, b) => a.x - b.x)
+  await page.mouse.move(right.x, right.y)
+  await page.mouse.down()
+  await page.mouse.move(left.x + (right.x - left.x) * 0.25, right.y, { steps: 12 })
+  await page.mouse.up()
+  await expect.poll(async () => (await renderedChart(page)).values.length).toBeLessThan(80)
+  const zoomed = await renderedChart(page)
+  expect(zoomed.values[0]).toBe(301)
+  expect(zoomed.firstBar).not.toBeNull()
+  if (zoomed.firstBar) await page.mouse.move(zoomed.firstBar.x, zoomed.firstBar.y)
+  await expect.poll(async () => (await renderedChart(page)).text).toContain('301')
+  await expect(results.getByRole('status').filter({ hasText: '160 rows returned' })).toBeVisible()
+  await reset.click()
+  await expect.poll(async () => (await renderedChart(page)).values).toEqual(before.values)
+  expect(requests).toEqual([sql])
+})
+
+test('unsuitable chart selections leave a useful outcome and a way back to the table', async ({ page }) => {
+  const text = 'SELECT product FROM products'
+  const empty = 'SELECT product FROM products WHERE false'
+  const pie = 'SELECT product, delta, zero FROM changes'
+  const { results, requests } = await runSql(page, [text, empty, pie].join(';\n'), {
+    [text]: rowsOutcome([{ name: 'product', type: 'String' }], [['Desk']]),
+    [empty]: rowsOutcome([{ name: 'product', type: 'String' }], []),
+    [pie]: rowsOutcome([
+      { name: 'product', type: 'String' }, { name: 'delta', type: 'Int32' }, { name: 'zero', type: 'UInt32' },
+    ], [['Desk', -4, 0], ['Lamp', 2, 0]]),
+  })
+  const statement = results.getByRole('combobox', { name: 'Statement outcome' })
+  await results.getByRole('button', { name: 'Pie', exact: true }).click()
+  await expect(results.getByText(/Pie charts need non-negative values/)).toBeVisible()
+  await results.getByRole('combobox', { name: 'Slice size' }).selectOption('zero')
+  await expect(results.getByText(/Pie charts need at least one positive value/)).toBeVisible()
+  await statement.selectOption('0')
+  await expect(results.getByText(/No numeric columns to plot/)).toBeVisible()
+  await results.getByRole('button', { name: 'Table', exact: true }).click()
+  await expect(results.getByRole('cell', { name: 'Desk' })).toBeVisible()
+  await results.getByRole('button', { name: 'Pie', exact: true }).click()
+  await statement.selectOption('1')
+  await expect(results.getByRole('button', { name: 'Pie', exact: true })).toHaveCount(0)
+  await expect(results.getByRole('table').getByRole('columnheader', { name: 'product' })).toBeVisible()
+  await expect(results.getByRole('cell')).toHaveCount(0)
+  expect(requests).toEqual([text, empty, pie])
 })

@@ -75,11 +75,11 @@ export function DatabaseSidebar({ state, onRefresh }: { state: SchemaState; onRe
         }}
       />
       <div className="schema-heading"><h2>ClickHouse SQL editor</h2><button className="schema-refresh" type="button" onClick={refresh} disabled={state.status === 'loading'} aria-label="Refresh databases" title="Refresh databases"><Icon name="refresh" size="sm" aria-hidden="true" /></button></div>
-      <label className="schema-search"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" /><path d="m13 13 4 4" /></svg><input aria-label="Search databases and tables" placeholder="Search databases and tables…" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
+      <label className="schema-search"><svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" /><path d="m13 13 4 4" /></svg><input aria-label="Search databases, tables, and views" placeholder="Search databases, tables, and views…" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
       <div className="schema-content">
         {state.status === 'loading' && <p className="schema-message" role="status">Loading databases…</p>}
         {state.status === 'error' && <div className="schema-error" role="alert"><p>Could not load databases</p><span>{state.message}</span><button type="button" onClick={refresh}>Try again</button></div>}
-        {state.status === 'success' && databases.length === 0 && <p className="schema-message">{normalizedSearch ? 'No matching databases or tables.' : 'No user databases available.'}{!showSystemDatabases && systemCount > 0 && ' Enable system databases below to browse them.'}</p>}
+        {state.status === 'success' && databases.length === 0 && <p className="schema-message">{normalizedSearch ? 'No matching databases, tables, or views.' : 'No user databases available.'}{!showSystemDatabases && systemCount > 0 && ' Enable system databases below to browse them.'}</p>}
         {state.status === 'success' && <>
           <ul className="database-list">{regularDatabases.map((database) => <DatabaseGroup key={database.name} database={database} currentDatabase={state.schema.currentDatabase} search={normalizedSearch} selectedTable={selectedTable} onSelectTable={setSelectedTable} />)}</ul>
           {systemDatabases.length > 0 && <section aria-label="System databases" className="mt-4 border-t border-[var(--click-global-color-stroke-default)] pt-3">
@@ -94,6 +94,7 @@ export function DatabaseSidebar({ state, onRefresh }: { state: SchemaState; onRe
           setShowSystemDatabases(event.target.checked)
           if (!event.target.checked && selectedTable && ['system', 'information_schema'].includes(selectedTable.database.toLowerCase())) setSelectedTable(null)
         }} className="accent-[var(--click-global-color-accent-default)]" />Show system databases</label>}
+        <span>ClickHouse · localhost:8123</span>
       </footer>
     </aside>
   )

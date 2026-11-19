@@ -1,5 +1,5 @@
 import { formatCell } from './query'
-import type { QueryRow } from './query'
+import type { QueryColumn, QueryRow } from './query'
 
 export type ChartKind = 'bar' | 'area' | 'line' | 'pie'
 export type ResultsView = 'table' | ChartKind
@@ -23,4 +23,19 @@ export function chartNumber(value: unknown): number | null {
 
 export function chartPoints(rows: QueryRow[], xColumn: string, yColumn: string) {
   return rows.map((row) => ({ label: formatCell(row[xColumn]), value: chartNumber(row[yColumn]) }))
+}
+
+export function chartFields(columns: QueryColumn[], rows: QueryRow[]) {
+  const plottable = columns.filter(({ name }) => rows.some((row) => chartNumber(row[name]) !== null))
+  const numericType = /^(?:(?:Nullable|LowCardinality)\()*(?:U?Int\d+|B?Float\d+|Decimal\d*)(?:\b|\()/i
+  const numericColumns = plottable.map(({ name }) => name)
+  const category = columns.find(({ name }) => !numericColumns.includes(name))
+    ?? columns.find(({ type }) => !numericType.test(type))
+    ?? columns[0]
+  const measures = [...plottable.filter(({ type }) => numericType.test(type)), ...plottable.filter(({ type }) => !numericType.test(type))]
+  return {
+    numericColumns,
+    category: category?.name ?? '',
+    measures: measures.map(({ name }) => name),
+  }
 }

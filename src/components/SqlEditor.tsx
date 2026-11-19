@@ -62,10 +62,6 @@ export type SqlEditorHandle = { getValue: () => string; replaceSql: (sql: string
 
 type SqlEditorProps = { schema: DatabaseSchema | null; onChange: (value: string) => void; onRun: (statements: string[]) => Promise<void>; theme: Theme; bottomPadding: number; ref?: Ref<SqlEditorHandle>; onHistoryChange: (history: EditorHistory) => void }
 
-interface ContextMenu extends monaco.editor.IEditorContribution {
-  showContextMenu(anchor: { x: number; y: number }): void
-}
-
 const ctrl = navigator.userAgent.includes('Macintosh') ? monaco.KeyMod.WinCtrl : monaco.KeyMod.CtrlCmd
 
 function addReversibleCommentAction(editor: monaco.editor.IStandaloneCodeEditor) {
@@ -157,12 +153,6 @@ export function SqlEditor({ schema, onChange, onRun, theme, bottomPadding, ref, 
       editor.onDidDispose(() => { historyListener.dispose(); editorRef.current = null })
       updateHistory()
       actionRef.current.forEach((action) => action.dispose())
-      const editorNode = editor.getDomNode()
-      let selectionBeforeClick: monaco.Selection | null = null
-      function rememberSelection(event: MouseEvent) {
-        if (event.button === 0 && event.detail === 1) selectionBeforeClick = editor.getSelection()
-      }
-      editorNode?.addEventListener('mousedown', rememberSelection, true)
       const completionProvider = monaco.languages.registerCompletionItemProvider('sql', {
         triggerCharacters: ['.', '`', '"'],
         async provideCompletionItems(model, position, _context, token) {
@@ -218,17 +208,7 @@ export function SqlEditor({ schema, onChange, onRun, theme, bottomPadding, ref, 
             formatting.current = false
           }
         },
-      }), editor.onMouseUp(({ event, target }) => {
-        if (!event.leftButton || event.detail !== 2 || !target.position ||
-            (target.type !== monaco.editor.MouseTargetType.CONTENT_TEXT && target.type !== monaco.editor.MouseTargetType.CONTENT_EMPTY)) return
-        // Monaco selects the clicked word on double-click. Run uses the explicit selection or the clicked statement.
-        if (selectionBeforeClick && !selectionBeforeClick.isEmpty() && selectionBeforeClick.containsPosition(target.position)) {
-          editor.setSelection(selectionBeforeClick)
-        } else {
-          editor.setPosition(target.position)
-        }
-        editor.getContribution<ContextMenu>('editor.contrib.contextmenu')?.showContextMenu({ x: event.posx, y: event.posy })
-      }), { dispose: () => editorNode?.removeEventListener('mousedown', rememberSelection, true) }]
+      })]
       editor.focus()
     }}
     options={{

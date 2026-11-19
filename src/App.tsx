@@ -51,10 +51,14 @@ function App({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: () => void
         const outcome = await executeStatement(sql)
         outcomes.push({ sql, result: outcome })
         if (outcome.kind === 'rows' || outcome.kind === 'command') {
-          activity.succeed(activityId, outcome.durationMs, outcome.kind === 'rows' ? outcome.rows.length : 0)
+          activity.succeed(activityId, outcome.durationMs, outcome.kind === 'rows' ? outcome.rows.length : outcome.message)
           continue
         }
-        activity.fail(activityId, outcome.durationMs, failureMessage(outcome))
+        if (outcome.kind === 'unknown' || (outcome.kind === 'timeout' && outcome.writeOutcomeUnknown)) {
+          activity.unknown(activityId, outcome.durationMs, failureMessage(outcome))
+        } else {
+          activity.fail(activityId, outcome.durationMs, failureMessage(outcome))
+        }
         break
       }
 

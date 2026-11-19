@@ -33,7 +33,7 @@ Execute statements sequentially. Start the next statement after ClickHouse confi
 
 Keep undo and redo available in the toolbar. Ctrl+Left and Ctrl+Right move between word boundaries. Cmd+/ on macOS and Ctrl+/ on Windows/Linux toggle SQL line comments on the current line or all selected lines. Toggling twice restores the original SQL and indentation.
 
-Double-click opens the existing action popup beside the pointer. Its actions must remain visible and clickable above adjacent panels, including near the viewport edge and when the floating composer is expanded. Preserve the empty startup editor, visible composer, assistant toggle, theme switch, and activity-log access. Database-aware autocomplete is specified with the schema work in [Stage 4](04-schema-and-activity.md).
+Double-click selects the word. Right-click opens the compact action popup beside the pointer. Its actions must remain visible and clickable above adjacent panels, including near the viewport edge and when the floating composer is expanded. Preserve the empty startup editor, visible composer, assistant toggle, theme switch, and activity-log access. Database-aware autocomplete is specified with the schema work in [Stage 4](04-schema-and-activity.md).
 
 ## Acceptance scenarios to automate during implementation
 
@@ -46,15 +46,15 @@ Double-click opens the existing action popup beside the pointer. Its actions mus
 | Middle statement fails | Make the first write succeed, the second statement fail, and the third write a recognizable value. Verify the error is selected, the first change persists, and the third value was never written. Fix the failed SQL and rerun it from the caret. |
 | Middle statement times out | Verify the 10-minute default and that a statement completing after 60 seconds can still succeed. Use a simulated clock or a short test deadline to exercise expiry. Verify the timeout duration and statement position, cancellation in ClickHouse, the skipped final statement, and a successful subsequent run. Simulate loss of write confirmation and verify the unknown outcome and absence of an automatic retry. |
 | Editor shortcuts and workspace | From an empty workspace, type, undo, and redo. Navigate a line in both directions by word. Toggle comments twice on one line and an indented multiline selection. Check surrounding lines and toolbar access with the composer visible and hidden. |
-| Popup after scrolling | Double-click near different editor edges with the composer open and the results panel visible. Verify the menu follows the pointer, remains within the viewport, and accepts a click on Run or Format. |
+| Popup after scrolling | Right-click near different editor edges with the composer open and the results panel visible. Verify the menu follows the pointer, remains within the viewport, and accepts a click on Run or Format. |
 
 During implementation, cover SQL boundaries with focused tests, database effects and cancellation with ClickHouse integration tests, and shortcut, popup, and selector behavior with Playwright. The existing [browser smoke test](../../tests/app.spec.ts) and [server query tests](../../../tests/query-commands.test.ts) provide starting points. Run server tests with `npm test` from the repository root and browser tests with `npm test` from `client/`.
 
-**Manual review.** Run a mixed script, inspect each outcome, then introduce an error in the middle. Correct and rerun just that statement with the shortcut. Double-click near the bottom of the editor and use the menu after resizing the results panel.
+**Manual review.** Run a mixed script, inspect each outcome, then introduce an error in the middle. Correct and rerun just that statement with the shortcut. Right-click near the bottom of the editor and use the menu after resizing the results panel.
 
 ## Implementation decisions
 
-At a semicolon, caret execution uses the statement that ends there. In the gap after it, caret execution uses the following statement. Trailing whitespace after the last statement belongs to that last statement. A double-click inside an existing selection keeps that selection. Elsewhere, popup Run uses the clicked statement.
+At a semicolon, caret execution uses the statement that ends there. In the gap after it, caret execution uses the following statement. Trailing whitespace after the last statement belongs to that last statement. Right-click inside an existing selection keeps that selection. Elsewhere, popup Run uses the clicked statement.
 
 The results panel uses an ordered selector to switch between recorded outcomes.
 

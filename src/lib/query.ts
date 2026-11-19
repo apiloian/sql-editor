@@ -1,3 +1,4 @@
+import { fetchApi } from './api'
 import { isReadVerb, sqlTokens, statementVerb } from './sql'
 
 export type QueryRow = Record<string, unknown>
@@ -58,7 +59,7 @@ export async function executeStatement(query: string, source: 'editor' | 'metada
   })
 
   try {
-    const response = await fetch('/query', {
+    const response = await fetchApi('/query', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(source === 'metadata' ? { query, source } : { query }),

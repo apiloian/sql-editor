@@ -1,7 +1,9 @@
+import { fetchApi } from './api'
+
 export type AssistantAction = 'generate' | 'fix' | 'explain' | 'improve'
 
 export async function requestAssistant(action: AssistantAction, prompt: string, sql: string, signal: AbortSignal): Promise<string> {
-  const response = await fetch('/assistant', {
+  const response = await fetchApi('/assistant', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action, prompt, sql }), signal,
   })
