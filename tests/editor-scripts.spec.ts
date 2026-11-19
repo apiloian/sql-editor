@@ -202,7 +202,7 @@ test('right-click opens a compact editor menu beside the pointer above results a
 
   const prompt = page.getByRole('textbox', { name: 'Ask the SQL assistant' })
   await prompt.fill('Review this script.\nCheck that the last statement returns the expected row.')
-  await expect(page.locator('.assistant-composer')).toHaveAttribute('data-expanded', 'true')
+  await expect(page.getByTestId('copilot-chat-input')).toHaveAttribute('data-layout', 'expanded')
   const editorBox = await editor.boundingBox()
   if (!editorBox) throw new Error('Expected the editor to have visible bounds.')
   await input.press(modifier === 'Meta' ? 'Meta+ArrowDown' : 'Control+End')

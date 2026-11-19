@@ -26,6 +26,7 @@ function rowsOutcome(columns: QueryColumn[], rows: unknown[][], truncated = fals
 
 async function runSql(page: Page, editorSql: string, outcomes: Record<string, QueryOutcome>, followupSql?: string) {
   await page.addInitScript((statements) => {
+    performance.setResourceTimingBufferSize(1_000)
     localStorage.setItem('sql-editor-ui.query-activity.v1', JSON.stringify(statements.map((sql, index) => ({
       id: `results-seed-${index}`, sql, startedAt: Date.now() - index, database: 'default',
       status: 'success', duration: 1, rowCount: 0,
@@ -291,6 +292,10 @@ async function renderedChart(page: Page) {
       area: Boolean(series.option.areaStyle),
       category: (chart.getOption().xAxis?.[0]?.data ?? []) as string[],
       values: data.mapArray(series.subType === 'pie' ? 'value' : 'y', (value: number) => Number.isNaN(value) ? null : value) as (number | null)[],
+      series: chart.getModel().getSeries().map((item: typeof series) => ({
+        name: item.name,
+        values: item.getData().mapArray(item.subType === 'pie' ? 'value' : 'y', (value: number) => Number.isNaN(value) ? null : value),
+      })) as { name: string; values: (number | null)[] }[],
       slices: series.subType === 'pie' ? Array.from({ length: data.count() }, (_, index) => {
         const slice = data.getItemGraphicEl(index)
         const label = slice.getTextContent()
@@ -309,20 +314,24 @@ async function renderedChart(page: Page) {
           },
         }
       }) : [],
-      handles: elements.filter((element: { cursor: string; draggable: boolean }) => element.draggable && element.cursor === 'ew-resize')
-        .map((element: { getBoundingRect(): { x: number; y: number; width: number; height: number }; transformCoordToGlobal(x: number, y: number): number[] }) => {
-          const { x, y, width, height } = element.getBoundingRect()
-          const [localX, localY] = element.transformCoordToGlobal(x + width / 2, y + height / 2)
-          return { x: bounds.x + localX, y: bounds.y + localY }
-        }) as { x: number; y: number }[],
-      firstBar: series.subType === 'bar' && data.count() ? (
-        () => {
-          const bar = data.getItemGraphicEl(0).shape
-          return { x: bounds.x + bar.x + bar.width / 2, y: bounds.y + bar.y + bar.height / 2 }
-        }
-      )() : null,
+      barPoints: series.subType === 'bar' ? Array.from({ length: data.count() }, (_, index) => {
+        const bar = data.getItemGraphicEl(index)?.shape
+        return bar ? { x: bounds.x + bar.x + bar.width / 2, y: bounds.y + bar.y + bar.height / 2 } : null
+      }) : [],
+      trendPoints: series.subType === 'line' ? Array.from({ length: data.count() }, (_, index) => {
+        const plot = series.coordinateSystem.master.getRect()
+        return { x: bounds.x + chart.convertToPixel({ xAxisIndex: 0 }, index), y: bounds.y + plot.y + plot.height / 2 }
+      }) : [],
+      zoomControls: (chart.getOption().dataZoom ?? []).map(({ type }: { type: string }) => type) as string[],
     }
   })
+}
+
+async function dragAcrossChart(page: Page, from: { x: number; y: number }, to: { x: number; y: number }) {
+  await page.mouse.move(from.x, from.y)
+  await page.mouse.down()
+  await page.mouse.move(to.x, to.y, { steps: 12 })
+  await page.mouse.up()
 }
 
 test('suggests fields, capitalizes axis titles, and changes measures and statements locally', async ({ page }) => {
@@ -360,22 +369,91 @@ test('suggests fields, capitalizes axis titles, and changes measures and stateme
   expect(requests).toEqual([first, second])
 })
 
-test('line and area preserve query order and a missing measure', async ({ page }) => {
+test('line and area zoom and reset while preserving query order and gaps', async ({ page }) => {
   const sql = 'SELECT month, registrations FROM monthly_totals'
   const { results, requests } = await runSql(page, sql, {
     [sql]: rowsOutcome([{ name: 'month', type: 'String' }, { name: 'registrations', type: 'Nullable(UInt32)' }], [
-      ['March', 10], ['January', null], ['February', 30], ['April', 25],
+      ['March', 10], ['January', 15], ['February', null], ['April', 25], ['May', 33],
     ]),
   })
   for (const view of ['Line', 'Area']) {
     await results.getByRole('button', { name: view, exact: true }).click()
+    const reset = results.getByRole('button', { name: 'Reset zoom' })
+    await expect(reset).toBeDisabled()
     await expect(results.getByRole('status').filter({ hasText: 'These appear as gaps.' })).toBeVisible()
     await expect.poll(async () => (await renderedChart(page)).area).toBe(view === 'Area')
     const chart = await renderedChart(page)
-    expect(chart.category).toEqual(['March', 'January', 'February', 'April'])
-    expect(chart.values).toEqual([10, null, 30, 25])
+    expect(chart.category).toEqual(['March', 'January', 'February', 'April', 'May'])
+    expect(chart.values).toEqual([10, 15, null, 25, 33])
+    expect(chart.zoomControls).not.toContain('slider')
+    await dragAcrossChart(page, chart.trendPoints[1], chart.trendPoints[3])
+    await expect.poll(async () => (await renderedChart(page)).values).toEqual([15, null, 25])
+    await expect(reset).toBeEnabled()
+    await reset.click()
+    await expect(reset).toBeDisabled()
+    await expect.poll(async () => (await renderedChart(page)).values).toEqual(chart.values)
   }
   expect(requests).toEqual([sql])
+})
+
+test('splits bar, line and area into aligned series and keeps pie independent', async ({ page }) => {
+  await page.setViewportSize({ width: 1360, height: 1000 })
+  const sql = 'SELECT month, signups, channel FROM grouped_monthly_signups'
+  const { results, requests } = await runSql(page, sql, {
+    [sql]: rowsOutcome([
+      { name: 'month', type: 'String' }, { name: 'signups', type: 'UInt32' }, { name: 'channel', type: 'String' },
+    ], [['March', 31, 'Web'], ['March', 22, 'Mobile'], ['January', 12, 'Mobile'], ['February', 45, 'Web'], ['February', 19, 'Mobile']]),
+  })
+  const split = results.getByRole('combobox', { name: 'Split by' })
+  await results.getByRole('button', { name: 'Bar', exact: true }).click()
+  await expect(split).toHaveValue('')
+  await split.selectOption('channel')
+  const segments = [
+    { name: 'Web', values: [31, null, 45] },
+    { name: 'Mobile', values: [22, 12, 19] },
+  ]
+  for (const view of ['Bar', 'Line', 'Area']) {
+    await results.getByRole('button', { name: view, exact: true }).click()
+    await expect(split).toHaveValue('channel')
+    await expect.poll(async () => (await renderedChart(page)).series).toEqual(segments)
+    const chart = await renderedChart(page)
+    expect(chart.category).toEqual(['March', 'January', 'February'])
+    expect(chart.text).toEqual(expect.arrayContaining(['Web', 'Mobile']))
+    if (view === 'Area') expect(chart.area).toBe(true)
+  }
+
+  await results.getByRole('button', { name: 'Pie', exact: true }).click()
+  await expect(split).toHaveCount(0)
+  await expect.poll(async () => (await renderedChart(page)).slices.length).toBe(5)
+  await results.getByRole('button', { name: 'Bar', exact: true }).click()
+  await expect(split).toHaveValue('channel')
+  await split.selectOption('')
+  await expect.poll(async () => (await renderedChart(page)).series).toEqual([{ name: 'Signups', values: [31, 22, 12, 45, 19] }])
+  expect(requests).toEqual([sql])
+})
+
+test('explains duplicate pairs and too many series without discarding query results', async ({ page }) => {
+  const repeated = 'SELECT month, signups, channel FROM duplicate_channels'
+  const crowded = 'SELECT month, signups, channel FROM crowded_channels'
+  const columns = [
+    { name: 'month', type: 'String' }, { name: 'signups', type: 'UInt32' }, { name: 'channel', type: 'String' },
+  ]
+  const { results, requests } = await runSql(page, repeated + ';\n' + crowded, {
+    [repeated]: rowsOutcome(columns, [['January', 15, 'Web'], ['January', 26, 'Web']]),
+    [crowded]: rowsOutcome(columns, Array.from({ length: 9 }, (_, index) => ['January', index + 1, 'Channel ' + index])),
+  })
+  const outcome = results.getByRole('combobox', { name: 'Statement outcome' })
+  const split = results.getByRole('combobox', { name: 'Split by' })
+  await results.getByRole('button', { name: 'Line', exact: true }).click()
+  await split.selectOption('channel')
+  await expect(results.getByText(/(?:up to|at most) 8/i)).toBeVisible()
+  await outcome.selectOption('0')
+  await expect(results.getByText(/GROUP BY/i)).toBeVisible()
+  await split.selectOption('')
+  await expect.poll(async () => (await renderedChart(page)).values).toEqual([15, 26])
+  await results.getByRole('button', { name: 'Table', exact: true }).click()
+  await expect(results.getByRole('cell', { name: '26', exact: true })).toBeVisible()
+  expect(requests).toEqual([repeated, crowded])
 })
 
 test('pie focuses the slice, matching connector, and label through two hovers in both themes', async ({ page }) => {
@@ -420,7 +498,7 @@ test('pie focuses the slice, matching connector, and label through two hovers in
   expect(requests).toEqual([sql])
 })
 
-test('bar slider zooms the visible range and resets without changing rows', async ({ page }) => {
+test('dragging across bars zooms the selected range and resets without changing rows', async ({ page }) => {
   await page.setViewportSize({ width: 1360, height: 1050 })
   const sql = 'SELECT product, revenue FROM dense_bars'
   const rows = Array.from({ length: 160 }, (_, i) => ['Product ' + (i + 1), 301 + i])
@@ -429,23 +507,32 @@ test('bar slider zooms the visible range and resets without changing rows', asyn
   })
   await results.getByRole('button', { name: 'Bar', exact: true }).click()
   const reset = results.getByRole('button', { name: 'Reset zoom' })
+  await expect(reset).toBeDisabled()
   const before = await renderedChart(page)
   expect(before.values).toHaveLength(160)
-  expect(before.handles).toHaveLength(2)
-  const [left, right] = [...before.handles].sort((a, b) => a.x - b.x)
-  await page.mouse.move(right.x, right.y)
-  await page.mouse.down()
-  await page.mouse.move(left.x + (right.x - left.x) * 0.25, right.y, { steps: 12 })
-  await page.mouse.up()
-  await expect.poll(async () => (await renderedChart(page)).values.length).toBeLessThan(80)
+  expect(before.zoomControls).not.toContain('slider')
+  const first = before.barPoints[25]
+  const last = before.barPoints[59]
+  if (!first || !last) throw new Error('Expected bars for both ends of the selection.')
+  await page.mouse.click(first.x, first.y)
+  expect((await renderedChart(page)).values).toEqual(before.values)
+  await expect(reset).toBeDisabled()
+  await dragAcrossChart(page, first, last)
+  await expect.poll(async () => (await renderedChart(page)).values).toEqual(before.values.slice(25, 60))
   const zoomed = await renderedChart(page)
-  expect(zoomed.values[0]).toBe(301)
-  expect(zoomed.firstBar).not.toBeNull()
-  if (zoomed.firstBar) await page.mouse.move(zoomed.firstBar.x, zoomed.firstBar.y)
-  await expect.poll(async () => (await renderedChart(page)).text).toContain('301')
+  const innerFirst = zoomed.barPoints[5]
+  const innerLast = zoomed.barPoints[12]
+  if (!innerFirst || !innerLast) throw new Error('Expected selectable bars after zooming.')
+  await dragAcrossChart(page, innerLast, innerFirst)
+  await expect.poll(async () => (await renderedChart(page)).values).toEqual(before.values.slice(30, 38))
+  const firstVisible = (await renderedChart(page)).barPoints[0]
+  if (!firstVisible) throw new Error('Expected a visible bar after the second zoom.')
+  await page.mouse.move(firstVisible.x, firstVisible.y)
+  await expect.poll(async () => (await renderedChart(page)).text).toContain('331')
   await expect(results.getByRole('status').filter({ hasText: '160 rows returned' })).toBeVisible()
   await reset.click()
   await expect.poll(async () => (await renderedChart(page)).values).toEqual(before.values)
+  await expect(reset).toBeDisabled()
   expect(requests).toEqual([sql])
 })
 

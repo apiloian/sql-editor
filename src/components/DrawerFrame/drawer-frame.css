@@ -1,0 +1,7 @@
+@layer components {
+  .table-drawer { display: flex; flex-direction: column; inset: 0 0 0 auto; width: min(480px, 100vw); height: 100dvh; max-height: none; overflow: hidden; padding: 0; border: 0; border-left: 1px solid var(--click-global-color-stroke-default); border-radius: 0; transform: none; animation: none; }
+  .table-drawer > div:has(> h2) { flex: 0 0 var(--workspace-header-height); padding-inline: 16px 60px; background: var(--click-global-color-background-muted); border-bottom: 1px solid var(--click-global-color-stroke-default); }
+  .table-drawer > div:has(> h2) + div:empty { display: none; }
+  .table-drawer > div > h2 { min-width: 0; font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+  .drawer-close { position: absolute; inset-block-start: calc(var(--workspace-header-height) / 2); inset-inline-end: 16px; transform: translateY(-50%); }
+}

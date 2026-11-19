@@ -15,7 +15,7 @@ export type StatementOutcome = {
 export type QueryState =
   | { status: 'idle' }
   | { status: 'running'; statementNumber: number; statementCount: number }
-  | { status: 'complete'; statements: StatementOutcome[]; selected: number }
+  | { status: 'complete'; runId: number; statements: StatementOutcome[]; lastAttemptedIndex: number }
 
 export const DEFAULT_PAGE_SIZE = 50
 export const DEFAULT_RESULT_LIMIT = 10_000

@@ -13,5 +13,17 @@ test('the app starts and renders the SQL editor page', async ({ page }) => {
   await expect(page.getByRole('complementary', { name: 'Database explorer' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Open database sidebar', exact: true }).click()
   await expect(page.getByRole('complementary', { name: 'Database explorer' })).toBeVisible()
+
+  const theme = page.getByRole('button', { name: 'Dark mode', exact: true })
+  await theme.press('Enter')
+  await expect(theme).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+  await theme.press('Enter')
+  await expect(theme).toHaveAttribute('aria-pressed', 'false')
+
+  await page.setViewportSize({ width: 390, height: 740 })
+  await page.getByRole('button', { name: 'Close database sidebar', exact: true }).click()
+  await expect(page.getByRole('switch', { name: 'SQL assistant' })).toBeInViewport({ ratio: 1 })
+  await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeInViewport({ ratio: 1 })
   expect(pageErrors).toEqual([])
 })

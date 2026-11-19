@@ -1,0 +1,16 @@
+# 6A. Conversation and runtime
+
+**Outcome.** A follow-up can refer to earlier turns in the same open editor tab. The user can type or dictate through the prebuilt CopilotKit composer. The transcript can stay hidden. [Stage 6 overview](06-assistant.md)
+
+**Starting point.** The original client sent an action, a prompt, and editor SQL for each independent request. Stage 6A replaced the presets with a conversation and kept the four restricted schema operations. [Composer](../../src/components/AssistantComposer/AssistantComposer.tsx) · [Express handler](../../../src/assistant.ts) · [Metadata tools](../../../src/assistant-metadata.ts)
+
+**Implementation scope**
+
+- **Client.** Keep recent conversation context for the open tab across composer collapse and assistant toggles. Reload starts fresh and a second tab starts independently. Use CopilotChatInput in the floating layout. Configure its microphone control so the transcript appears in the same editable draft as typed text. Stopping dictation leaves the draft available to correct and send.
+- **Runtime integration.** Connect the prebuilt input to the active conversation and the Express runtime. Submit a free-form message with its editor context. Keep credentials and metadata access on the server.
+- **Server.** Carry relevant prior turns and current editor context into follow-ups. Keep schema lookups restricted to the existing metadata operations. The user’s Run action remains the only route to executing editor SQL.
+- **Diagnostics.** Trial a trace ID per assistant request with correlated model and tool events. Capture timestamps, model or tool name, duration, outcome, a sanitized error category, and usage when available. Keep prompts, SQL, result rows, tool arguments and outputs, and credentials out of diagnostic logs. Conversation context stays separate from traces and query activity. A dedicated trace viewer is optional.
+
+**Acceptance and review.** With controlled model responses, introduce a definition that does not appear in the generated SQL and refer to it in a later turn. Check that the later request carries the definition after collapsing and toggling the composer, and that reloading or opening a new tab starts independently. Submit a typed turn, dictate a follow-up, correct one word, and press Send. Verify one submission with the corrected text, zero submissions on microphone stop, and no preset selector or action field. Simulate a failed schema lookup and locate it by trace ID without exposing its inputs. Verify that these actions produce zero editor SQL executions and zero query activity entries. For manual review, use the registrations follow-up in the overview and inspect the SQL before running it.
+
+**Implementation.** The React composer connects to the Express CopilotKit runtime at `/assistant` under the configured API base. Configure the model with `OPENAI_API_KEY` and optionally `OPENAI_MODEL` on the server. The tab keeps recent successful turns in memory and displays the latest answer. The microphone runs the existing local Whisper worker. Stop adds the final transcription to the draft for editing before Send. Stage 6A introduced undoable whole-editor replacement. Stage 6B adds selection-aware edits, and Stage 6C covers chart preparation.

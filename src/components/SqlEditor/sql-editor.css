@@ -1,0 +1,75 @@
+@layer components {
+  .editor-loading { display: grid; height: 100%; place-items: center; color: var(--muted); font-size: 13px; }
+  .editor-action-message { position: absolute; top: 12px; right: 20px; left: 60px; z-index: 6; display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--click-global-color-stroke-default); border-radius: 6px; background: var(--click-global-color-background-muted); color: var(--click-global-color-text-default); box-shadow: 0 3px 12px var(--click-global-color-shadow-default); font-size: 12px; line-height: 1.6; }
+  .editor-action-message button { display: grid; place-items: center; margin-left: auto; padding: 4px; border: 0; border-radius: 3px; background: transparent; color: inherit; }
+}
+
+body .editor-panel .context-view.monaco-menu-container {
+  position: fixed;
+  z-index: 40;
+  --vscode-menu-background: var(--click-global-color-background-default);
+  --vscode-menu-foreground: var(--click-global-color-text-default);
+  --vscode-menu-selectionBackground: var(--click-global-color-background-muted);
+  --vscode-menu-selectionForeground: var(--click-global-color-text-default);
+  --vscode-menu-selectionBorder: transparent;
+  --vscode-menu-separatorBackground: var(--click-global-color-stroke-default);
+  --vscode-menu-border: var(--click-global-color-stroke-default);
+  --vscode-disabledForeground: var(--click-global-color-text-disabled);
+  --vscode-cornerRadius-large: 8px;
+}
+body .monaco-menu-container .monaco-menu {
+  min-width: 204px;
+  max-width: calc(100vw - 24px);
+  padding: 4px;
+  border: 1px solid var(--click-global-color-stroke-default);
+  border-radius: 8px;
+  background: var(--click-global-color-background-default);
+  color: var(--click-global-color-text-default);
+  box-shadow: 0 6px 24px var(--click-global-color-shadow-default);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+body .monaco-menu-container .monaco-menu .monaco-action-bar.vertical .action-item {
+  margin: 1px 0;
+  border-radius: 4px;
+}
+body .monaco-menu-container .monaco-menu .action-menu-item {
+  min-height: 29px;
+  padding: 0 8px;
+  border-radius: 4px;
+  gap: 8px;
+}
+body .monaco-menu-container .monaco-menu .action-menu-item .action-label {
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font-size: 12px;
+  line-height: 29px;
+}
+body .monaco-menu-container .monaco-menu .action-menu-item .keybinding {
+  margin-left: auto;
+  padding-left: 14px;
+  color: var(--click-global-color-text-muted);
+  font-size: 11px;
+  line-height: 29px;
+  letter-spacing: .02em;
+}
+body .monaco-menu-container .monaco-menu .action-item:not(.disabled) .action-menu-item:hover,
+body .monaco-menu-container .monaco-menu .action-item.focused .action-menu-item {
+  background: var(--click-global-color-background-muted);
+  color: var(--click-global-color-text-default);
+}
+body .monaco-menu-container .monaco-menu .action-item.disabled .action-menu-item {
+  opacity: .45;
+}
+body .monaco-menu-container .monaco-menu .action-item .action-label.separator {
+  margin: 5px 6px;
+  padding: 0;
+  height: 1px;
+  min-height: 0;
+  line-height: 0;
+  border-bottom-color: var(--click-global-color-stroke-default);
+}
+body .monaco-menu-container .monaco-menu .action-item:has(.separator) .action-menu-item {
+  min-height: 0;
+  padding: 0;
+}

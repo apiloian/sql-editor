@@ -23,6 +23,21 @@ export type SchemaState =
   | { status: 'success'; schema: DatabaseSchema }
   | { status: 'error'; message: string }
 
+const viewEngine = /^(View|MaterializedView|LiveView|WindowView)$/i
+
+export function isSystemDatabase(name: string): boolean {
+  const normalized = name.toLowerCase()
+  return normalized === 'system' || normalized === 'information_schema'
+}
+
+export function csvImportDestinations(schema: DatabaseSchema) {
+  return schema.databases
+    .filter((database) => !isSystemDatabase(database.name))
+    .flatMap(({ name: database, tables }) => tables
+      .filter(({ engine }) => !viewEngine.test(engine))
+      .map(({ name }) => ({ database, name })))
+}
+
 function sqlString(value: string): string {
   return `'${value.replaceAll('\\', '\\\\').replaceAll("'", "\\'")}'`
 }
@@ -34,10 +49,10 @@ function metadataCount(value: unknown): string | null {
   throw new Error('The server returned an invalid table statistic.')
 }
 
-export async function loadTableMetadata(table: TableReference): Promise<TableMetadata> {
+export async function loadTableMetadata(table: TableReference, signal?: AbortSignal): Promise<TableMetadata> {
   const [columns, rows] = await Promise.all([
-    loadTableColumns(table),
-    executeQuery(`SELECT engine, sorting_key, primary_key, partition_key, sampling_key, create_table_query, comment, total_rows, total_bytes FROM system.tables WHERE database = ${sqlString(table.database)} AND name = ${sqlString(table.name)}`),
+    loadTableColumns(table, signal),
+    executeQuery(`SELECT engine, sorting_key, primary_key, partition_key, sampling_key, create_table_query, comment, total_rows, total_bytes FROM system.tables WHERE database = ${sqlString(table.database)} AND name = ${sqlString(table.name)}`, signal),
   ])
   const row = rows[0]
   if (!row) throw new Error('This table no longer exists or is not visible to this connection.')
@@ -55,8 +70,8 @@ export async function loadTableMetadata(table: TableReference): Promise<TableMet
   }
 }
 
-export async function loadTableColumns({ database, name }: TableReference): Promise<TableColumn[]> {
-  const rows = await executeQuery(`SELECT name, type, default_kind, default_expression, comment FROM system.columns WHERE database = ${sqlString(database)} AND table = ${sqlString(name)} ORDER BY position`)
+export async function loadTableColumns({ database, name }: TableReference, signal?: AbortSignal): Promise<TableColumn[]> {
+  const rows = await executeQuery(`SELECT name, type, default_kind, default_expression, comment FROM system.columns WHERE database = ${sqlString(database)} AND table = ${sqlString(name)} ORDER BY position`, signal)
   return rows.map((row) => {
     if (typeof row.name !== 'string' || typeof row.type !== 'string' || typeof row.default_kind !== 'string' || typeof row.default_expression !== 'string' || typeof row.comment !== 'string') {
       throw new Error('The server returned invalid column metadata.')
@@ -65,8 +80,8 @@ export async function loadTableColumns({ database, name }: TableReference): Prom
   })
 }
 
-export async function loadCompletionColumns(database: string): Promise<CompletionColumn[]> {
-  const rows = await executeQuery(`SELECT table, name, type FROM system.columns WHERE database = ${sqlString(database)} ORDER BY table, position`)
+export async function loadCompletionColumns(database: string, signal?: AbortSignal): Promise<CompletionColumn[]> {
+  const rows = await executeQuery(`SELECT table, name, type FROM system.columns WHERE database = ${sqlString(database)} ORDER BY table, position`, signal)
   return rows.map(({ table, name, type }) => {
     if (typeof table !== 'string' || typeof name !== 'string' || typeof type !== 'string') {
       throw new Error('The server returned invalid completion metadata.')
@@ -75,10 +90,10 @@ export async function loadCompletionColumns(database: string): Promise<Completio
   })
 }
 
-export async function loadDatabaseSchema(): Promise<DatabaseSchema> {
+export async function loadDatabaseSchema(signal?: AbortSignal): Promise<DatabaseSchema> {
   const [databaseRows, tableRows] = await Promise.all([
-    executeQuery('SELECT name, engine, currentDatabase() AS current_database FROM system.databases ORDER BY name'),
-    executeQuery('SELECT database, name, engine FROM system.tables WHERE is_temporary = 0 ORDER BY database, name'),
+    executeQuery('SELECT name, engine, currentDatabase() AS current_database FROM system.databases ORDER BY name', signal),
+    executeQuery('SELECT database, name, engine FROM system.tables WHERE is_temporary = 0 ORDER BY database, name', signal),
   ])
   const databases = new Map<string, DatabaseInfo>()
   let currentDatabase: string | null = null

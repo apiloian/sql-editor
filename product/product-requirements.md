@@ -52,7 +52,8 @@ For review, run a three-statement script whose second statement exceeds the time
 - Offer bar, area, line, and pie charts for suitable query results.
 - On a pie chart, give each leader line (the connector between a slice and its label) the same color as its slice. Verify this on a pie with several differently colored slices.
 - Hovering over a pie slice keeps that slice, its label, and its leader line clearly visible while the other slices, labels, and lines fade into the background, as in the visual reference. Moving to another slice transfers the emphasis. Moving off the slices restores the full chart.
-- Support zoom on bar charts so users can inspect a smaller range and return to the full view. The zoom controls and which other chart types should support zoom are open design decisions.
+- Drag across the plot in bar, line, or area charts to zoom into a category range. Use **Reset zoom** to restore the full range.
+- Optionally split bar, line, or area charts into series by a third result column. Keep one row per category and split value. Use SQL to aggregate or limit the groups when needed.
 - Use a limited palette with enough distinct colors to reduce repetition. The palette size and how to handle more categories than colors are open design decisions.
 
 Charts use all rows returned for the selected statement. Pagination controls belong to the table. For example, when a query returns 800 rows and the table shows 50 per page, the chart uses all 800. Moving to page two leaves the chart unchanged.
@@ -112,11 +113,11 @@ For review, check header-only, shorter-than-20, exactly-20, and longer-than-20 f
 
 ## AI assistant
 
-- Keep the optional floating composer. It expands on focus and as the prompt grows. Typed and dictated prompts share one conversation per open editor tab. Preserve recent context when the composer collapses or the assistant is toggled. A reload starts a fresh conversation.
-- Support generating, fixing, improving, and explaining SQL. Explain can insert comments into the editor. Apply each assistant edit as one undoable change. For the first trial, make the editor read-only while the assistant works, indicate the busy state, and restore editing on success, failure, or cancellation.
+- Use CopilotKit’s prebuilt CopilotChatInput as the optional floating composer. Configure voice dictation to fill the editable prompt for review and explicit submission. It expands on focus and as the prompt grows. Typed and dictated prompts share one conversation per open editor tab. Preserve recent context when the composer collapses or the assistant is toggled. A reload starts a fresh conversation.
+- Use one free-form prompt for requests and follow-ups. Retire the Generate, Fix, Improve, and Explain presets and their action-specific request handling. Apply each assistant edit as one undoable change. For the first trial, make the editor read-only while the assistant works, indicate the busy state, and restore editing on success, failure, or cancellation.
 - The assistant can use restricted schema metadata tools and configure the table or chart view. Only an explicit user Run action executes editor SQL. The assistant has no tool for executing user queries.
 - A request can prepare SQL and a chart together. Bind the prepared view to that SQL. The latest choice made in the composer or through a selector wins. Populate the chart when the user successfully runs the associated SQL. For existing results, changing the view reuses those results.
-- The preferred implementation to evaluate is headless CopilotKit with its built-in agent and a runtime endpoint in Express. Keep model credentials and schema tools on the server. React owns editor edits and chart settings.
+- Connect the prebuilt input to the tab’s conversation through the CopilotKit runtime in Express. Keep model credentials and schema tools on the server. React owns editor edits and chart settings.
 
 **Implementation trials.** Compare selection-only and whole-editor edits on a multi-statement script. Review the lock during chart-only requests, selector placement, clarification prompts, and the fallback when a chart cannot display the result. Decide whether the model needs actual result values. Start the trial with column names, types, and the SQL that produced the result.
 

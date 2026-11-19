@@ -1,4 +1,5 @@
 import * as monaco from 'monaco-editor/editor/editor.api'
+import { isSystemDatabase } from './schema'
 import type { CompletionColumn, DatabaseInfo, DatabaseSchema } from './schema'
 import { sqlTokens } from './sql'
 
@@ -6,7 +7,6 @@ const keywords = ['SELECT', 'FROM', 'WHERE', 'GROUP BY', 'ORDER BY', 'LIMIT', 'O
 const functions = ['count', 'sum', 'avg', 'min', 'max', 'uniq', 'uniqExact', 'toDate', 'toDateTime', 'toString', 'toStartOfDay', 'toStartOfMonth', 'now', 'today', 'concat', 'ifNull', 'coalesce', 'numbers', 'abs']
 const keywordWords = new Set(keywords.flatMap(keyword => keyword.split(' ')))
 const plainIdentifier = /^[a-z_][a-z_0-9]*$/i
-const systemDatabase = /^(system|information_schema)$/i
 const kind = monaco.languages.CompletionItemKind
 
 function quoteMark(text: string): '"' | '`' | undefined {
@@ -53,7 +53,7 @@ function completionContext(line: string, position: monaco.Position) {
 }
 
 export function createCompletionCatalog(schema: DatabaseSchema, loadColumns: (database: string) => Promise<Map<string, CompletionColumn[]>>) {
-  const databases = new Map(schema.databases.filter(database => !systemDatabase.test(database.name))
+  const databases = new Map(schema.databases.filter(database => !isSystemDatabase(database.name))
     .map(database => [database.name, database]))
   async function columnsFor(database: DatabaseInfo) {
     return loadColumns(database.name).catch(() => new Map<string, CompletionColumn[]>())

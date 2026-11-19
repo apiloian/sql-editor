@@ -1,5 +1,42 @@
 # Implementation decisions
 
+- 2026-11-19. Stage 6c uses the existing validated `sql-editor.suggest-view` AG-UI event from the custom Express agent. React binds a prepared view to a Monaco model revision and source span. A view applied after Run belongs to one execution and one statement outcome. This keeps identical statements distinct and lets view changes reuse returned rows. The model receives the producing SQL and column metadata.
+- 2026-11-19. The results panel shows a separate **Prepared view** selector while the statement is waiting for Run. Editing clears the preparation. Failed executions leave it available for retry, and unsuitable chart fields return the user to the table with a reason. The first trial keeps the assistant's editor lock and uses the existing model prompt to ask about ambiguous targets.
+
+- 2026-11-19. The activity recorder accepts each attempted statement's result through `finish` and maps it to the existing history format. `WorkspacePanels` owns the divider and mounts the editor pane before results exist. The schema model shares system database classification and selects CSV destinations in catalog order.
+
+- 2026-11-19. Each component in `src/components/` has a named folder for its TSX file and any stylesheet it owns. Callers import the TSX module directly. This keeps related files adjacent while making editor tabs and import destinations identifiable by component name.
+
+- 2026-11-19. The results grid keeps its page and widths while the lazy chart renders the same positional row result. Chart choices match column names and their occurrence across compatible results, and chart data reads by column index.
+- 2026-11-19. Monaco command and completion registrations follow the editor lifetime. CSV uses a typed request module and a phase hook that checks the active request before publishing a response. The assistant turn hook owns SDK setup, rollback, and cleanup under the existing provider. Schema loaders forward React Query cancellation to metadata fetches.
+
+- 2026-11-19. Feature styles load from their owning components. `index.css` establishes the cascade layers and keeps theme defaults, focus styles, and cross-feature rules. Monaco and CopilotKit overrides stay unlayered, and the results table styles the chart container while the chart module loads.
+
+- 2026-11-19. The sidebar, workspace divider, and result columns use browser-managed pointer release. Their sizing rules and keyboard controls stay with each feature because they use distinct units and drag origins.
+
+- 2026-11-19. Activity and table details share `DrawerFrame` for Click UI Dialog, the close control, and focus restoration. The Activity drawer keeps its status menu inside its own toolbar and handles focus for its clear confirmation.
+
+- 2026-11-19. `WorkspaceToolbar` renders the Click UI controls from display values and named callbacks. `App` connects those actions to Monaco, script execution, and the workspace dialogs.
+
+- 2026-11-19. Client refactor Stage 1 gives the script executor ownership of sequential requests, progress, and the last attempted outcome. The results panel tracks browsing by run ID and keeps view and page-size preferences across runs. The workspace receives a boolean for Run availability and reads SQL from Monaco when executing an action.
+
+- 2026-11-19. CSV import, both drawers, and the Clear logs confirmation use Click UI Dialog. The drawers share the toolbar header height and keep their right-side layout in CSS. The clear confirmation focuses Cancel when it opens. CSV import keeps its existing rules for closing while a request is active.
+
+- 2026-11-19. The activity log uses Click UI for its status filter and action buttons. Its filter opens inside the native drawer so the browser keeps it interactive in the modal. The drawer and toolbar share one header height, with extra room for the toolbar to wrap on phones.
+
+- 2026-11-19. The workspace toolbar uses Click UI buttons and switch for shared visual states and keyboard interactions. Undo and redo keep their Lucide glyphs inside Click UI buttons because the installed icon set lacks those glyphs. Toolbar CSS handles layout and compact sizing.
+
+- 2026-11-19. The Stage 6B edit target follows the editor selection at Send. With an empty selection the target is the whole editor. Express validates the selected offsets and asks for a replacement for that range. Monaco applies the captured edit in one undo step and discards a response when the model version or selection no longer matches.
+
+- 2026-11-19. Stage 6A uses CopilotKit's React input and Express runtime with AG-UI over server-sent events. The editor tab supplies up to 12 recent conversation messages and the live editor SQL. Express bounds the context, runs the existing four read-only schema tools, and retains handles only for active requests. The local Whisper worker still supplies live dictation and leaves the final text in the editable draft. The client applies an optional whole-editor replacement as one undoable change after a successful response. The editor stays read-only while a request is pending. Only Run executes editor SQL.
+- 2026-11-19. The assistant traces requests, model calls, and schema tool calls under one server-generated trace ID. Logs carry event metadata, sanitized outcomes, and token counts when available. Errors show the trace ID beside the composer. Conversation content and SQL stay out of these traces.
+
+- 2026-11-18. Bar, Line, and Area support **Split by** with a legend and up to eight series. The client aligns groups to categories in first-seen order and leaves missing pairs as gaps. SQL still owns aggregation. Duplicate pairs show grouping guidance. Bars are grouped side by side, and area fills overlap with reduced opacity.
+
+- 2026-11-18. Line and area charts reuse bar charts' drag-to-zoom and **Reset zoom**. The zoomed range retains query order and gaps for missing values.
+
+- 2026-11-18. Bar zoom now uses a horizontal drag inside the plot. Release to show the selected categories and use **Reset zoom** to restore the full range. Zoom acts on the existing result and the chart no longer reserves space for a slider.
+
 - 2026-11-18. Keep the shared query result types and row limit in `query.ts`. Browser query requests live in `query-api.ts` so Express can read the shared limit without loading Vite's environment configuration.
 
 - 2026-11-18. The browser reads `VITE_APP_API_BASE` at build time and appends the query, assistant, and CSV routes in one request helper. The base can include a path prefix. Vite no longer proxies API traffic. The API host owns CORS when it runs on a different origin.

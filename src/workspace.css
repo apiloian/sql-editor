@@ -1,0 +1,15 @@
+@layer components {
+  .sql-workspace { height: 100dvh; min-height: 480px; display: flex; overflow: hidden; background: #fff; position: relative; }
+  .workspace-main { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+  .workspace-panels { display: grid; flex: 1; min-height: 0; }
+  .editor-panel { position: relative; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .editor-panel > section { flex: 1; min-height: 0; }
+  .panel-divider { position: relative; z-index: 2; display: flex; justify-content: center; align-items: center; background: #fafbfc; border-block: 1px solid var(--border); cursor: row-resize; touch-action: none; transition: background .15s; }
+  .panel-divider::after { content: ''; position: absolute; inset: -3px 0; }
+  .panel-divider span { width: 17px; height: 1px; border-radius: 1px; background: #d7d9e0; }
+  .panel-divider:hover, .panel-divider:focus-visible { background: #eeebf7; }
+  [data-theme='dark'] .sql-workspace { background: var(--click-global-color-background-default); color: var(--click-global-color-text-default); }
+  [data-theme='dark'] .panel-divider { background: var(--click-global-color-background-muted); }
+  [data-theme='dark'] .panel-divider span { background: var(--click-global-color-stroke-intense); }
+  [data-theme='dark'] .panel-divider:hover, [data-theme='dark'] .panel-divider:focus-visible { background: var(--click-global-color-stroke-intense); }
+}

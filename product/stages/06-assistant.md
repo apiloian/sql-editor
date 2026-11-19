@@ -1,12 +1,11 @@
-# 6. Work with the assistant
+# 6. Work with the SQL assistant
 
-Use the floating composer, voice input, Express assistant handler, and schema metadata tools. Evaluate headless CopilotKit against the existing integration with one follow-up request before choosing the runtime.
+The user can ask for SQL, refine it in a follow-up, and prepare a table or chart. The user controls execution. CopilotKit’s prebuilt input accepts one free-form prompt through typing or dictation. [Product requirements](../product-requirements.md#ai-assistant)
 
-- [ ] Keep one conversation per open editor tab across typed and dictated turns, composer collapse, and assistant toggles. Start fresh on reload. Expand the composer on focus and with longer input.
-- [ ] Generate, explain, and revise SQL using restricted schema metadata. Apply each edit as one undoable change. Trial the read-only editor while the assistant works and restore editing on success, error, or cancellation. Compare selection edits with whole-editor edits.
-- [ ] Let the assistant prepare a chart tied to its SQL. Allow user overrides. Populate it after the user runs the associated SQL successfully. Reuse existing results for view-only changes. Expose no query-execution tool to the model.
-- [ ] Evaluate one trace ID per request with model/tool timing, outcomes, and available usage. Keep credentials on the server and exclude sensitive content from traces. Record only user-initiated SQL executions in query activity.
+| Implement in order | Working outcome to review |
+| --- | --- |
+| [6A. Conversation and runtime](06a-conversation.md) | Ask for registrations in the last three months, collapse the composer, and say “Group those by week.” The assistant retains the date range. |
+| [6B. SQL editing](06b-sql-editing.md) | Ask for a change to the intended SQL in a mixed script. Undo the assistant’s change in one step. |
+| [6C. Table and chart preparation](06c-visualization.md) | Ask for a chart, change the proposed view, and run the corresponding SQL. Adjust the visualization afterward using the existing result. |
 
-**Tests.** Use controlled assistant responses to check follow-up context, reload, input locking and recovery, undo, and the absence of execution requests during preparation. Override a prepared chart before Run and verify it uses the bound result. Change the view afterward and check the query request count. Simulate a schema lookup failure and inspect its trace for the failed step and omitted sensitive values. Extend the existing assistant, composer-focus, and voice suites where relevant.
-
-**Review.** Ask for registrations over three months, request a revision, choose the chart, and press Run yourself. Verify the result, chart, and single activity entry. Review the fallback when the requested chart cannot represent the columns.
+Each part includes client and server responsibilities, acceptance scenarios to automate during implementation, and a manual review. Record the composer and voice integration choices in 6A, the editing-scope decision in 6B, and the visualization UX decisions in 6C in the decision log.

@@ -1,0 +1,21 @@
+@layer components {
+  .assistant-dock { position: absolute; bottom: 24px; left: 24px; right: 24px; z-index: 5; pointer-events: none; }
+  .assistant-composer { position: relative; width: min(380px, 100%); margin: 0 auto; border: 1px solid var(--click-global-color-stroke-default); border-radius: 26px; background: var(--click-global-color-background-default); box-shadow: 0 3px 12px var(--click-global-color-shadow-default); pointer-events: auto; transition: width .18s ease; }
+  .assistant-composer:focus-within, .assistant-composer[data-voice-active='true'] { width: min(460px, 100%); border-color: var(--click-global-color-stroke-intense); }
+  .assistant-composer:has([data-layout='expanded']) { border-radius: 18px; }
+  @media (prefers-reduced-motion: reduce) { .assistant-composer { transition: none; } }
+  .assistant-notice { position: absolute; bottom: calc(100% + 10px); left: 0; right: 0; max-height: min(200px, 25dvh); overflow: auto; overflow-wrap: anywhere; white-space: pre-wrap; display: flex; align-items: start; gap: 12px; padding: 10px 14px; border: 1px solid var(--click-global-color-stroke-default); border-radius: 12px; background: var(--click-global-color-background-default); box-shadow: 0 4px 16px var(--click-global-color-shadow-default); color: var(--click-global-color-text-default); font-size: 12px; line-height: 1.5; }
+  .assistant-notice[role='alert'] { color: var(--click-global-color-text-danger); }
+  .assistant-notice button { display: grid; place-items: center; flex-shrink: 0; margin-left: auto; padding: 0 4px; border: 0; background: transparent; color: inherit; }
+
+  @media (max-width: 700px) {
+    .assistant-dock { left: 12px; right: 12px; }
+  }
+}
+
+.assistant-composer [data-copilotkit], .assistant-composer .copilotKitInput { background: transparent; border-radius: inherit; box-shadow: none; }
+.assistant-composer .copilotKitInput textarea { color: var(--click-global-color-text-default); font-size: 13px; }
+.assistant-composer .copilotKitInput textarea::placeholder { color: var(--click-global-color-text-muted); }
+.assistant-composer [data-testid='copilot-send-button'] { background: var(--click-button-basic-color-primary-background-default); color: var(--click-button-basic-color-primary-text-default); }
+.assistant-composer [data-testid='copilot-start-transcribe-button'] { color: var(--click-global-color-text-muted); }
+.assistant-composer [data-testid='copilot-start-transcribe-button'][aria-pressed='true'] { background: var(--click-alert-color-background-danger); color: var(--click-alert-color-text-danger); }

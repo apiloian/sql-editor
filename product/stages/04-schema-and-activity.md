@@ -11,7 +11,7 @@ A user can find a table or view, understand its columns, use those columns in SQ
 | Switch detail views | Redesign the three controls so the active view is clear. **Overview** shows object metadata, **Columns** shows each column with its type and available details, and the third view shows the stored creation statement. **DDL** shows the creation statement. For a view, show its own creation statement. |
 | Read a description | Show the object’s ClickHouse comment under **Description** in Overview. Show each available column comment alongside its column in Columns. Omit an empty description. When switching between objects, show metadata belonging to the selected object. |
 
-The sidebar filters system databases before matching the search. The details drawer reads comments and stored DDL through the existing query API and ClickHouse system tables. [Sidebar](../../src/components/DatabaseSidebar.tsx) · [Details drawer](../../src/components/TableDetails.tsx) · [Schema queries](../../src/lib/schema.ts)
+The sidebar filters system databases before matching the search. The details drawer reads comments and stored DDL through the existing query API and ClickHouse system tables. [Sidebar](../../src/components/DatabaseSidebar/DatabaseSidebar.tsx) · [Details drawer](../../src/components/TableDetails/TableDetails.tsx) · [Schema queries](../../src/lib/schema.ts)
 
 ## Schema-aware SQL completion
 
@@ -27,7 +27,7 @@ Keep the shared schema data usable by the Stage 3 CSV destination picker. Select
 - **Browser storage.** Keep the latest 200 runs in local storage under `sql-editor-ui.query-activity.v1`. Reloading restores saved entries and their metadata. Use the new key consistently for reading, writing, clearing, and cross-tab clear events.
 - **Clear logs.** Label the action **Clear logs**. Confirming clears the entire saved history, even with a status filter active, and closes both the confirmation and the drawer. Cancel or Escape dismisses only the confirmation and preserves the list. Clearing while a query is running must keep that entry cleared when it finishes.
 
-Activity history is browser-local. The backend supplies query outcomes through the execution path from Stages 1 and 2. [Activity drawer](../../src/components/QueryActivityDrawer.tsx) · [Storage hook](../../src/hooks/useQueryActivity.ts) · [Drawer layout](../../src/index.css)
+Activity history is browser-local. The backend supplies query outcomes through the execution path from Stages 1 and 2. [Activity drawer](../../src/components/QueryActivityDrawer/QueryActivityDrawer.tsx) · [Storage hook](../../src/hooks/useQueryActivity.ts) · [Drawer layout](../../src/index.css)
 
 ## Acceptance scenarios for implementation
 

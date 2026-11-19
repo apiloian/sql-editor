@@ -1,18 +1,36 @@
 import { useId, useState } from 'react'
 import { Icon } from '@clickhouse/click-ui'
-import type { DatabaseInfo, SchemaState, TableReference } from '../lib/schema'
-import { TableDetails } from './TableDetails'
+import { isSystemDatabase } from '../../lib/schema'
+import type { DatabaseInfo, DatabaseTable, SchemaState, TableReference } from '../../lib/schema'
+import { TableDetails } from '../TableDetails/TableDetails'
+import './database-sidebar.css'
 
-function isSystemDatabase(database: DatabaseInfo) {
-  return ['system', 'information_schema'].includes(database.name.toLowerCase())
+type VisibleDatabase = { database: DatabaseInfo; tables: DatabaseTable[] }
+
+function filterDatabases(databases: DatabaseInfo[], search: string, showSystem: boolean) {
+  const regular: VisibleDatabase[] = []
+  const system: VisibleDatabase[] = []
+  let systemCount = 0
+  for (const database of databases) {
+    const isSystem = isSystemDatabase(database.name)
+    if (isSystem) {
+      systemCount++
+      if (!showSystem) continue
+    }
+
+    const matchesName = database.name.toLowerCase().includes(search)
+    const tables = matchesName ? database.tables : database.tables.filter((table) => table.name.toLowerCase().includes(search))
+    if (!matchesName && !tables.length) continue
+    const group = isSystem ? system : regular
+    group.push({ database, tables })
+  }
+  return { regular, system, systemCount }
 }
 
-function DatabaseGroup({ database, currentDatabase, search, selectedTable, onSelectTable }: { database: DatabaseInfo; currentDatabase: string | null; search: string; selectedTable: TableReference | null; onSelectTable: (table: TableReference) => void }) {
+function DatabaseGroup({ database, tables, currentDatabase, searching, selectedTable, onSelectTable }: VisibleDatabase & { currentDatabase: string | null; searching: boolean; selectedTable: TableReference | null; onSelectTable: (table: TableReference) => void }) {
   const [expanded, setExpanded] = useState(database.name === currentDatabase)
   const listId = useId()
-  const matchesDatabase = database.name.toLowerCase().includes(search)
-  const tables = matchesDatabase ? database.tables : database.tables.filter((table) => table.name.toLowerCase().includes(search))
-  const open = expanded || Boolean(search)
+  const open = expanded || searching
 
   return (
     <li className="database-group">
@@ -36,11 +54,7 @@ export function DatabaseSidebar({ state, onRefresh }: { state: SchemaState; onRe
   const [sidebarWidth, setSidebarWidth] = useState(260)
   const normalizedSearch = search.trim().toLowerCase()
   const allDatabases = state.status === 'success' ? state.schema.databases : []
-  const systemCount = allDatabases.filter(isSystemDatabase).length
-  const visibleDatabases = allDatabases.filter((database) => showSystemDatabases || !isSystemDatabase(database))
-  const databases = visibleDatabases.filter((database) => database.name.toLowerCase().includes(normalizedSearch) || database.tables.some((table) => table.name.toLowerCase().includes(normalizedSearch)))
-  const regularDatabases = databases.filter((database) => !isSystemDatabase(database))
-  const systemDatabases = databases.filter(isSystemDatabase)
+  const { regular, system, systemCount } = filterDatabases(allDatabases, normalizedSearch, showSystemDatabases)
 
   function refresh() {
     setSelectedTable(null)
@@ -60,9 +74,6 @@ export function DatabaseSidebar({ state, onRefresh }: { state: SchemaState; onRe
           const bounds = event.currentTarget.parentElement?.getBoundingClientRect()
           if (bounds) setSidebarWidth(Math.max(220, Math.min(520, event.clientX - bounds.left)))
         }}
-        onPointerUp={(event) => {
-          if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
-        }}
         onDoubleClick={() => setSidebarWidth(260)}
         onKeyDown={(event) => {
           if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
@@ -79,12 +90,12 @@ export function DatabaseSidebar({ state, onRefresh }: { state: SchemaState; onRe
       <div className="schema-content">
         {state.status === 'loading' && <p className="schema-message" role="status">Loading databases…</p>}
         {state.status === 'error' && <div className="schema-error" role="alert"><p>Could not load databases</p><span>{state.message}</span><button type="button" onClick={refresh}>Try again</button></div>}
-        {state.status === 'success' && databases.length === 0 && <p className="schema-message">{normalizedSearch ? 'No matching databases, tables, or views.' : 'No user databases available.'}{!showSystemDatabases && systemCount > 0 && ' Enable system databases below to browse them.'}</p>}
+        {state.status === 'success' && !regular.length && !system.length && <p className="schema-message">{normalizedSearch ? 'No matching databases, tables, or views.' : 'No user databases available.'}{!showSystemDatabases && systemCount > 0 && ' Enable system databases below to browse them.'}</p>}
         {state.status === 'success' && <>
-          <ul className="database-list">{regularDatabases.map((database) => <DatabaseGroup key={database.name} database={database} currentDatabase={state.schema.currentDatabase} search={normalizedSearch} selectedTable={selectedTable} onSelectTable={setSelectedTable} />)}</ul>
-          {systemDatabases.length > 0 && <section aria-label="System databases" className="mt-4 border-t border-[var(--click-global-color-stroke-default)] pt-3">
+          <ul className="database-list">{regular.map((group) => <DatabaseGroup key={group.database.name} {...group} currentDatabase={state.schema.currentDatabase} searching={Boolean(normalizedSearch)} selectedTable={selectedTable} onSelectTable={setSelectedTable} />)}</ul>
+          {system.length > 0 && <section aria-label="System databases" className="mt-4 border-t border-[var(--click-global-color-stroke-default)] pt-3">
             <h3 className="m-0 px-3 pb-2 text-[10px] font-medium uppercase tracking-wide text-[var(--click-global-color-text-muted)]">System databases</h3>
-            <ul className="database-list">{systemDatabases.map((database) => <DatabaseGroup key={database.name} database={database} currentDatabase={state.schema.currentDatabase} search={normalizedSearch} selectedTable={selectedTable} onSelectTable={setSelectedTable} />)}</ul>
+            <ul className="database-list">{system.map((group) => <DatabaseGroup key={group.database.name} {...group} currentDatabase={state.schema.currentDatabase} searching={Boolean(normalizedSearch)} selectedTable={selectedTable} onSelectTable={setSelectedTable} />)}</ul>
           </section>}
         </>}
       </div>
@@ -92,7 +103,7 @@ export function DatabaseSidebar({ state, onRefresh }: { state: SchemaState; onRe
       <footer className="schema-footer">
         {state.status === 'success' && systemCount > 0 && <label className="flex cursor-pointer items-center gap-2 pb-2 text-[11px]"><input type="checkbox" checked={showSystemDatabases} onChange={(event) => {
           setShowSystemDatabases(event.target.checked)
-          if (!event.target.checked && selectedTable && ['system', 'information_schema'].includes(selectedTable.database.toLowerCase())) setSelectedTable(null)
+          if (!event.target.checked && selectedTable && isSystemDatabase(selectedTable.database)) setSelectedTable(null)
         }} className="accent-[var(--click-global-color-accent-default)]" />Show system databases</label>}
         <span>ClickHouse · localhost:8123</span>
       </footer>

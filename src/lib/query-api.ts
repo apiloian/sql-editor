@@ -29,7 +29,7 @@ function isStatementResult(value: unknown): value is StatementResult {
   }
 }
 
-export async function executeStatement(query: string, source: 'editor' | 'metadata' = 'editor'): Promise<StatementResult> {
+export async function executeStatement(query: string, source: 'editor' | 'metadata' = 'editor', signal?: AbortSignal): Promise<StatementResult> {
   const started = performance.now()
   const deliveryFailure = (message: string): StatementResult => ({
     kind: isReadVerb(statementVerb(sqlTokens(query))) ? 'error' : 'unknown',
@@ -42,17 +42,20 @@ export async function executeStatement(query: string, source: 'editor' | 'metada
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(source === 'metadata' ? { query, source } : { query }),
+      signal,
     })
     const data: unknown = await response.json().catch(() => null)
+    signal?.throwIfAborted()
     if (isStatementResult(data)) return data
     return deliveryFailure(response.ok ? 'The query server returned an invalid response.' : `The query server returned HTTP ${response.status}.`)
   } catch {
+    signal?.throwIfAborted()
     return deliveryFailure('The connection to the query server was lost before confirmation.')
   }
 }
 
-export async function executeQuery(query: string): Promise<QueryRow[]> {
-  const result = await executeStatement(query, 'metadata')
+export async function executeQuery(query: string, signal?: AbortSignal): Promise<QueryRow[]> {
+  const result = await executeStatement(query, 'metadata', signal)
   if (result.kind === 'rows') return result.rows.map(row => Object.fromEntries(result.columns.map(({ name }, index) => [name, row[index]])))
   if ('message' in result) throw new Error(result.message)
   throw new Error('The metadata query exceeded its execution deadline.')

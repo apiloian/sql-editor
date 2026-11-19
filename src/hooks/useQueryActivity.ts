@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { failureMessage } from '../lib/query'
+import type { StatementResult } from '../lib/query'
 
 export const ACTIVITY_LIMIT = 200
 const STORAGE_KEY = 'sql-editor-ui.query-activity.v1'
@@ -120,27 +122,25 @@ export function useQueryActivity() {
     setStore({ entries: [], warning })
   }
 
-  function complete(id: string, outcome: ActivityOutcome) {
+  function finish(id: string, result: StatementResult) {
     if (!pending.current.delete(id)) return
+    const outcome = activityOutcome(result)
     commit((entries) => {
       const entry = entries.find((item) => item.id === id)
       return entry && { ...entry, ...outcome }
     })
   }
 
-  function succeed(id: string, duration: number, details: number | string) {
-    complete(id, typeof details === 'number'
-      ? { status: 'success', duration, rowCount: details }
-      : { status: 'success', duration, message: details })
-  }
+  return { ...store, start, finish, clear }
+}
 
-  function fail(id: string, duration: number, error: string) {
-    complete(id, { status: 'error', duration, error })
+function activityOutcome(result: StatementResult): ActivityOutcome {
+  const duration = result.durationMs
+  if (result.kind === 'rows') return { status: 'success', duration, rowCount: result.rows.length }
+  if (result.kind === 'command') return { status: 'success', duration, message: result.message }
+  const message = failureMessage(result)
+  if (result.kind === 'unknown' || (result.kind === 'timeout' && result.writeOutcomeUnknown)) {
+    return { status: 'unknown', duration, message }
   }
-
-  function unknown(id: string, duration: number, message: string) {
-    complete(id, { status: 'unknown', duration, message })
-  }
-
-  return { ...store, start, succeed, fail, unknown, clear }
+  return { status: 'error', duration, error: message }
 }

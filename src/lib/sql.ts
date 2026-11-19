@@ -71,22 +71,46 @@ function statementText(sql: string, { start, end, hasInlineData }: StatementRang
 }
 
 export function splitStatements(sql: string): string[] {
-  return statementRanges(sql).map(range => statementText(sql, range))
+  return editorStatements(sql).map(statement => statement.sql)
 }
 
-export function statementsForRun(sql: string, selection: { start: number; end: number }): string[] {
+export type EditorStatement = { sql: string; start: number; end: number }
+
+function editorStatement(sql: string, offset: number, hasInlineData = false): EditorStatement {
+  if (hasInlineData) return { sql, start: offset, end: offset + sql.length }
+  const tokens = sqlTokens(sql).filter(({ text, depth }) => text !== ';' || depth !== 0)
+  return { sql, start: offset + (tokens[0]?.start ?? 0), end: offset + (tokens.at(-1)?.end ?? sql.length) }
+}
+
+export function editorStatements(sql: string, offset = 0): EditorStatement[] {
+  return statementRanges(sql).map((range) => rangedEditorStatement(sql, range, offset))
+}
+
+function rangedEditorStatement(sql: string, range: StatementRange, offset = 0): EditorStatement {
+  const source = sql.slice(range.start, range.end)
+  const text = statementText(sql, range)
+  return editorStatement(text, offset + range.start + source.length - source.trimStart().length, range.hasInlineData)
+}
+
+export function editorStatementsForRun(sql: string, selection: { start: number; end: number }): EditorStatement[] {
   if (selection.start !== selection.end) {
     const text = sql.substring(selection.start, selection.end)
     if (!text.trim()) return []
     const ranges = statementRanges(text)
-    if (ranges.length <= 1) return [text]
-    return ranges.map(({ start, end }, index) => text.slice(start, index === ranges.length - 1 ? text.length : end + 1))
+    if (ranges.length <= 1) return [editorStatement(text, selection.start, ranges[0]?.hasInlineData)]
+    return ranges.map(({ start, end, hasInlineData }, index) => editorStatement(
+      text.slice(start, index === ranges.length - 1 ? text.length : end + 1), selection.start + start, hasInlineData,
+    ))
   }
 
   const ranges = statementRanges(sql)
   // At a semicolon, use the statement it ends. After it, use the next statement if there is one.
-  const current = ranges.find(range => selection.start <= range.end) ?? ranges.at(-1)
-  return current ? [statementText(sql, current)] : []
+  const range = ranges.find(item => selection.start <= item.end) ?? ranges.at(-1)
+  return range ? [rangedEditorStatement(sql, range)] : []
+}
+
+export function statementsForRun(sql: string, selection: { start: number; end: number }): string[] {
+  return editorStatementsForRun(sql, selection).map(statement => statement.sql)
 }
 
 export function statementVerb(tokens: SqlToken[]): string {

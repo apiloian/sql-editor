@@ -1,6 +1,9 @@
 import { readFile } from 'node:fs/promises'
 import { runInNewContext } from 'node:vm'
 import { expect, test } from '@playwright/test'
+import { mockAssistantRuntime } from './assistant-runtime.ts'
+
+test.use({ launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] } })
 
 const workerSource = await readFile(new URL('../public/workers/whisper-transcriber.js', import.meta.url), 'utf8')
 const withoutImport = workerSource.replace(/^import[^\n]+\n/, '')
@@ -42,9 +45,8 @@ test('live inference coalesces updates and flushes audio arriving during inferen
 })
 
 test.describe('voice composer with synthetic microphone and stub inference', () => {
-  test.use({ launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] } })
-
-  test('shows live text before Stop and commits the final text once', async ({ page }) => {
+  test('dictation joins the typed conversation and submits only the edited text on Send', async ({ page, context }) => {
+    const runs = await mockAssistantRuntime(context, () => ({ text: 'Got it.' }))
     await page.route('**/query', (route) => route.fulfill({ json: { rows: [] } }))
     await page.route('**/workers/whisper-transcriber.js', (route) => route.fulfill({
       contentType: 'text/javascript',
@@ -52,10 +54,17 @@ test.describe('voice composer with synthetic microphone and stub inference', () 
     }))
     await page.goto('/')
     const input = page.getByRole('textbox', { name: 'Ask the SQL assistant' })
+    const send = page.getByRole('button', { name: 'Send to SQL assistant' })
+    await expect(page.getByTestId('copilot-chat-input').locator(':scope > [data-layout]')).toHaveCSS('padding-top', '4px')
+    await expect(send).toHaveCSS('width', '32px')
+    await input.fill('Count trips')
+    await send.click()
+    await expect(page.getByText('Got it.', { exact: true })).toBeVisible()
     await input.fill('Please')
     await page.getByRole('button', { name: 'Start voice input' }).click()
     const stop = page.getByRole('button', { name: 'Stop recording' })
     await expect(stop).toBeVisible()
+    await expect(stop.locator('.lucide-square')).toBeVisible()
     await expect(input).toHaveValue('Please show trips', { timeout: 15_000 })
     await expect(input).toHaveValue('Please show trips by month', { timeout: 15_000 })
     await expect(stop).toBeVisible()
@@ -63,5 +72,10 @@ test.describe('voice composer with synthetic microphone and stub inference', () 
     await expect(page.getByRole('button', { name: 'Start voice input' })).toBeVisible()
     await expect(input).toHaveValue('Please show trips by month')
     await expect(input).toBeEditable()
+    expect(runs).toHaveLength(1)
+    await input.fill('Please show trips by week')
+    await send.click()
+    await expect.poll(() => runs.length).toBe(2)
+    expect(runs[1].messages.map(({ content }) => content)).toEqual(['Count trips', 'Got it.', 'Please show trips by week'])
   })
 })
