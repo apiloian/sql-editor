@@ -23,7 +23,9 @@ export function AssistantComposer(props: ComposerProps) {
       </div>
     </div>
   }
-  return <CopilotKitProvider runtimeUrl={runtimeUrl} agentId={ASSISTANT_AGENT_ID} useSingleEndpoint={false} enableInspector={false} showDevConsole={false}>
+  return <CopilotKitProvider runtimeUrl={runtimeUrl} agentId={ASSISTANT_AGENT_ID} useSingleEndpoint={false} enableInspector={false} showDevConsole={false} headers={{
+    'ngrok-skip-browser-warning': 'true',
+  }}>
     <AssistantConversation {...props} />
   </CopilotKitProvider>
 }
