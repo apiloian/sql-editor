@@ -151,7 +151,7 @@ test('object descriptions, columns and stored DDL follow the selected object and
   await expect(page.locator('.monaco-editor .view-line')).toHaveText('SELECT user_id FROM default.orders')
 })
 
-test('a late metadata response cannot replace a second object in the compact narrow drawer', async ({ page }) => {
+test('closing a narrow drawer cancels its pending metadata request and the next drawer shows its own object', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 650 })
   let signalRequested!: () => void
   const firstRequested = new Promise<void>((resolve) => { signalRequested = resolve })
@@ -166,6 +166,8 @@ test('a late metadata response cannot replace a second object in the compact nar
   await sidebar.getByRole('button', { name: 'orders MergeTree', exact: true }).click()
   await firstRequested
   await expect(page.getByRole('dialog', { name: 'default.orders' }).getByRole('status')).toContainText('Loading table details')
+  const cancelledOverview = page.waitForEvent('requestfailed', request =>
+    request.url().endsWith('/query') && request.postDataJSON().query.includes("name = 'orders'"))
   await page.keyboard.press('Escape')
 
   await search.fill(longName)
@@ -173,9 +175,8 @@ test('a late metadata response cannot replace a second object in the compact nar
   const drawer = page.getByRole('dialog', { name: `archive.${longName}` })
   const close = drawer.getByRole('button', { name: 'Close table details' })
   await expect(drawer.getByText('Archive of older orders')).toBeVisible()
-  const firstResponse = page.waitForResponse((response) => response.url().endsWith('/query') && response.request().postDataJSON().query.includes("name = 'orders'"))
   releaseOverview()
-  await firstResponse
+  expect((await cancelledOverview).failure()?.errorText).toContain('ABORTED')
   await expect(drawer.getByText('Archive of older orders')).toBeVisible()
   await expect(drawer.getByText('Submitted orders')).toBeHidden()
 

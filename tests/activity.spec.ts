@@ -1,6 +1,11 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 
 const activityKey = 'sql-editor-ui.query-activity.v1'
+
+async function filterByStatus(page: Page, label: string) {
+  await page.getByRole('button', { name: 'Filter activity log by status' }).click()
+  await page.getByRole('listbox', { name: 'Activity statuses' }).getByRole('option', { name: label }).click()
+}
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript((key) => {
@@ -27,7 +32,7 @@ test('clearing requires confirmation, clears every status, and persists after re
   await page.getByRole('button', { name: 'Cancel', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Clear logs', exact: true })).toBeFocused()
   await expect(dialog.locator('.activity-entry')).toHaveCount(1)
-  await page.getByRole('combobox', { name: 'Filter activity log by status' }).selectOption('error')
+  await filterByStatus(page, 'Failed')
   await expect(dialog.getByText('No matching queries')).toBeVisible()
   await page.getByRole('button', { name: 'Clear logs', exact: true }).click()
   await page.getByRole('button', { name: 'Clear all', exact: true }).click()
@@ -56,13 +61,12 @@ test('finishing a cleared running query does not restore its activity entry', as
   await page.getByRole('button', { name: 'Run', exact: true }).click()
   await running
   await page.getByRole('button', { name: 'Open activity log' }).click()
-  const filter = page.getByRole('combobox', { name: 'Filter activity log by status' })
-  await filter.selectOption('running')
+  await filterByStatus(page, 'Running')
   await expect(page.getByRole('region', { name: 'Run commands' }).getByRole('button')).toHaveCount(1)
   await page.getByRole('button', { name: 'Clear logs', exact: true }).click()
   await page.getByRole('button', { name: 'Clear all', exact: true }).click()
   finish()
-  await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeAttached()
+  await expect(page.getByRole('cell', { name: '42', exact: true })).toBeVisible()
   await expect(page.getByRole('dialog', { name: 'Activity log', exact: true })).toHaveCount(0)
   await expect(page.getByRole('alertdialog')).toHaveCount(0)
   await page.getByRole('button', { name: 'Open activity log' }).click()
@@ -89,26 +93,25 @@ test('filters saved outcomes and formats activity SQL while loading the original
   await page.reload()
   await page.getByRole('button', { name: 'Open activity log' }).click()
   const dialog = page.getByRole('dialog', { name: 'Activity log' })
-  const filter = dialog.getByRole('combobox', { name: 'Filter activity log by status' })
   const list = dialog.getByRole('region', { name: 'Run commands' })
   const details = dialog.getByRole('region', { name: 'Selected query details' })
   const sql = details.locator('.activity-sql code')
   await expect(dialog.getByText('4 queries', { exact: true })).toBeVisible()
   await expect(dialog.getByText('Last 200 runs · Stored in this browser')).toBeVisible()
-  await filter.selectOption('running')
+  await filterByStatus(page, 'Running')
   await expect(list.getByText('No matching queries')).toBeVisible()
-  await filter.selectOption('unknown')
+  await filterByStatus(page, 'Unknown')
   await expect(list.getByRole('button')).toHaveCount(1)
   await expect(details.getByText('The write could not be confirmed.')).toBeVisible()
-  await filter.selectOption('error')
+  await filterByStatus(page, 'Failed')
   await expect(list.getByRole('button')).toHaveCount(1)
   await expect(details.getByText('Unclosed string literal')).toBeVisible()
   await expect(sql).toHaveJSProperty('textContent', invalidSql)
-  await filter.selectOption('success')
+  await filterByStatus(page, 'Success')
   await expect(list.getByRole('button')).toHaveCount(2)
   await list.getByRole('button', { name: /CREATE TABLE orders/ }).click()
   await expect(details.getByText('Created table orders.')).toBeVisible()
-  await filter.selectOption('all')
+  await filterByStatus(page, 'All statuses')
   await expect(list.getByRole('button')).toHaveCount(4)
   await list.getByRole('button', { name: /select 42/ }).click()
   await expect(sql).toHaveJSProperty('textContent', 'SELECT\n    42\nFROM\n    numbers(1)\nWHERE\n    number = 0')
