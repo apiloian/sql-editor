@@ -162,12 +162,12 @@ export default function ResultsChart({ result, kind, theme, axes, onAxesChange }
             {numericFields.map(({ index, label }) => <option key={index} value={label}>{label}</option>)}
           </select>
         </label>
-        {!isPie && <label>Split by
+        {/* {!isPie && <label>Split by
           <select value={splitField?.label ?? ''} onChange={(event) => selectField('splitColumn', event.target.value)} disabled={splitFields.length === 0}>
             <option value="">None</option>
             {splitFields.map(({ index, label }) => <option key={index} value={label}>{label}</option>)}
           </select>
-        </label>}
+        </label>} */}
         {canZoom && !message && <button type="button" className="chart-reset-zoom disabled:opacity-50" disabled={zoomedChartKey !== chartKey} onClick={resetZoom}>Reset zoom</button>}
       </div>
       <div className="chart-stage">

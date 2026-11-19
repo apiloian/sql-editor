@@ -1,6 +1,7 @@
 import { useId, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { formatDdlForDisplay } from '../../lib/format-sql'
 import type { TableReference } from '../../lib/schema'
 import { tableMetadataQuery } from '../../lib/schema-queries'
 import { DrawerFrame } from '../DrawerFrame/DrawerFrame'
@@ -86,7 +87,7 @@ export function TableDetails({ table, onClose }: { table: TableReference; onClos
           </div>)}</dl>}
         </>}
         {metadata && item.id === 'ddl' && (metadata.overview.createSql
-          ? <pre className="drawer-sql"><code>{metadata.overview.createSql}</code></pre>
+          ? <pre className="drawer-sql"><code>{formatDdlForDisplay(metadata.overview.createSql)}</code></pre>
           : <p className="drawer-caption">Creation SQL is unavailable for this object.</p>)}
         </>}
       </div>)}

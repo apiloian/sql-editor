@@ -2,7 +2,9 @@ const configuredBase: string | undefined = import.meta.env.VITE_APP_API_BASE
 const apiBase = configuredBase?.trim()
 
 export function apiUrl(path: `/${string}`): string | undefined {
-  return apiBase ? `${apiBase.replace(/\/+$/, '')}${path}` : undefined
+  if (!apiBase) return
+  const url = `${apiBase.replace(/\/+$/, '')}${path}`
+  return url.startsWith('/') ? new URL(url, window.location.origin).href : url
 }
 
 export function fetchApi(path: `/${string}`, options: RequestInit): Promise<Response> {

@@ -6,7 +6,7 @@ A user can keep several statements in one editor, run the SQL they intend, and s
 
 ## Stage 1 foundation
 
-The workspace opens with an empty Monaco editor, a visible assistant composer, and controls for editing history, theme, and activity. Stage 1 added sequential execution and a results panel that retains one outcome per statement. Express already owns the 10-minute deadline and uses the ClickHouse query ID to request cancellation. [Workspace](../../src/App.tsx) · [Server execution](../../../src/query-execution.ts)
+The workspace opens with an empty Monaco editor, a visible assistant composer, and controls for editing history, theme, and activity. Stage 1 added sequential execution and a results panel that retains one outcome per statement. Express already owns the 10-minute deadline and uses the ClickHouse query ID to request cancellation. [Workspace](../../src/App.tsx) · [Server execution](../../../src/query/execution.ts)
 
 ## Choosing what runs
 

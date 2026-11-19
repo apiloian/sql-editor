@@ -2,7 +2,7 @@
 
 **Outcome.** A follow-up can refer to earlier turns in the same open editor tab. The user can type or dictate through the prebuilt CopilotKit composer. The transcript can stay hidden. [Stage 6 overview](06-assistant.md)
 
-**Starting point.** The original client sent an action, a prompt, and editor SQL for each independent request. Stage 6A replaced the presets with a conversation and kept the four restricted schema operations. [Composer](../../src/components/AssistantComposer/AssistantComposer.tsx) · [Express handler](../../../src/assistant.ts) · [Metadata tools](../../../src/assistant-metadata.ts)
+**Starting point.** The original client sent an action, a prompt, and editor SQL for each independent request. Stage 6A replaced the presets with a conversation and kept the four restricted schema operations. [Composer](../../src/components/AssistantComposer/AssistantComposer.tsx) · [Express handler](../../../src/assistant/assistant.ts) · [Metadata tools](../../../src/assistant/metadata.ts)
 
 **Implementation scope**
 

@@ -2,14 +2,14 @@ import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
 const longName = 'archived_orders_with_a_long_qualified_name_for_narrow_drawers'
-const ordersDdl = "CREATE TABLE default.orders (user_id UInt32 COMMENT 'ID of the purchaser', amount UInt64) ENGINE = MergeTree ORDER BY user_id COMMENT 'Submitted orders'"
+const ordersDdl = "CREATE TABLE default.orders (user_id UInt32 COMMENT 'ID of the purchaser', amount Decimal(18, 4), CONSTRAINT positive_amount CHECK (amount > 0)) ENGINE = MergeTree ORDER BY user_id COMMENT 'Submitted orders'"
 const viewDdl = 'CREATE VIEW archive.recent_orders AS SELECT user_id FROM default.orders ORDER BY user_id'
 const plainDdl = 'CREATE TABLE default.plain_table (value UInt32) ENGINE = Memory'
 
 const objects = [
   { database: 'default', name: 'orders', engine: 'MergeTree', ddl: ordersDdl, comment: 'Submitted orders', columns: [
     ['user_id', 'UInt32', '', '', 'ID of the purchaser'],
-    ['amount', 'UInt64', 'DEFAULT', '0', ''],
+    ['amount', 'Decimal(18, 4)', 'DEFAULT', '0', ''],
   ] },
   { database: 'archive', name: 'recent_orders', engine: 'View', ddl: viewDdl, comment: 'A view of recent orders', columns: [
     ['user_id', 'UInt32', '', '', ''],
@@ -101,7 +101,7 @@ test('search finds objects in collapsed databases and follows system visibility'
   await expect(systemTable).toBeHidden()
 })
 
-test('object descriptions, columns and stored DDL follow the selected object and preserve the editor', async ({ page }) => {
+test('object descriptions, columns and formatted DDL follow the selected object and preserve the editor', async ({ page }) => {
   const { sidebar, search } = await openExplorer(page)
   await page.getByRole('textbox', { name: 'SQL query' }).focus()
   await page.keyboard.insertText('SELECT user_id FROM default.orders')
@@ -128,7 +128,14 @@ test('object descriptions, columns and stored DDL follow the selected object and
 
   await ddlTab.click()
   await expect(ddlTab).toHaveAttribute('aria-selected', 'true')
-  await expect(table.getByRole('tabpanel', { name: 'DDL' }).locator('pre')).toHaveJSProperty('textContent', ordersDdl)
+  await expect(table.getByRole('tabpanel', { name: 'DDL' }).locator('pre')).toHaveJSProperty('textContent', [
+    'CREATE TABLE default.orders (',
+    "\tuser_id UInt32 COMMENT 'ID of the purchaser',",
+    '\tamount Decimal(18, 4),',
+    '\tCONSTRAINT positive_amount CHECK (amount > 0)',
+    ')',
+    "ENGINE = MergeTree ORDER BY user_id COMMENT 'Submitted orders'",
+  ].join('\n'))
   await table.getByRole('button', { name: 'Close table details' }).click()
 
   await search.fill('recent_orders')
@@ -136,7 +143,15 @@ test('object descriptions, columns and stored DDL follow the selected object and
   const view = page.getByRole('dialog', { name: 'archive.recent_orders' })
   await expect(view.getByRole('tabpanel', { name: 'Overview' }).getByText('A view of recent orders')).toBeVisible()
   await view.getByRole('tab', { name: 'DDL' }).click()
-  await expect(view.getByRole('tabpanel', { name: 'DDL' }).locator('pre')).toHaveJSProperty('textContent', viewDdl)
+  await expect(view.getByRole('tabpanel', { name: 'DDL' }).locator('pre')).toHaveJSProperty('textContent', [
+    'CREATE VIEW archive.recent_orders AS',
+    'SELECT',
+    '    user_id',
+    'FROM',
+    '    default.orders',
+    'ORDER BY',
+    '    user_id',
+  ].join('\n'))
   await page.keyboard.press('Escape')
 
   await search.clear()

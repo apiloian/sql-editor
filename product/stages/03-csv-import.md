@@ -4,7 +4,7 @@ A user with a CSV can add its records to an existing ClickHouse table from the S
 
 ## Where the existing product starts
 
-The React workspace already loads database and table names. Its schema helpers can also retrieve column names, types, and default expressions. These provide a starting point for choosing a destination. The workspace currently has no file-import action. Express serves query and assistant requests and has a ClickHouse client, but it has no CSV upload, verification, or import handler. [Workspace](../../src/App.tsx) · [Schema helpers](../../src/lib/schema.ts) · [Express server](../../../src/index.ts)
+The React workspace already loads database and table names. Its schema helpers can also retrieve column names, types, and default expressions. These provide a starting point for choosing a destination. The workspace currently has no file-import action. Express serves query and assistant requests and has a ClickHouse client, but it has no CSV upload, verification, or import handler. [Workspace](../../src/App.tsx) · [Schema helpers](../../src/lib/schema.ts) · [Express server](../../../src/app.ts)
 
 ## Frontend experience
 

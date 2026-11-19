@@ -2,9 +2,9 @@ import { useRef, useState } from 'react'
 import { Logs } from 'lucide-react'
 import { Button, Dialog, Icon, Select } from '@clickhouse/click-ui'
 import type { IconName } from '@clickhouse/click-ui'
-import { clickhouse, formatDialect } from 'sql-formatter'
 import { ACTIVITY_LIMIT } from '../../hooks/useQueryActivity'
 import type { QueryActivity } from '../../hooks/useQueryActivity'
+import { formatSqlForDisplay } from '../../lib/format-sql'
 import { DrawerFrame } from '../DrawerFrame/DrawerFrame'
 import './query-activity-drawer.css'
 
@@ -27,14 +27,6 @@ function durationLabel(duration: number | null) {
 
 function timestamp(value: number) {
   return new Date(value).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })
-}
-
-function formatActivitySql(sql: string) {
-  try {
-    return formatDialect(sql, { dialect: clickhouse, tabWidth: 4, keywordCase: 'upper' })
-  } catch {
-    return sql
-  }
 }
 
 type Props = { entries: QueryActivity[]; warning: string | null; onClose: () => void; onClear: () => void; onLoad: (sql: string) => void; loadDisabled?: boolean }
@@ -101,7 +93,7 @@ export function QueryActivityDrawer({ entries, warning, onClose, onClear, onLoad
           </dl>
           {selected.status === 'unknown' && <p className="activity-note">{'message' in selected ? selected.message : 'The server may still be running this query or may have completed it.'}</p>}
           {selected.status === 'error' && <pre className="activity-error">{selected.error}</pre>}
-          <pre className="activity-sql"><code>{formatActivitySql(selected.sql)}</code></pre>
+          <pre className="activity-sql"><code>{formatSqlForDisplay(selected.sql)}</code></pre>
         </section>}
       </div>
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>

@@ -39,7 +39,7 @@ for (const failure of ['timeout', 'error'] as const) {
     const requests: string[] = []
 
     const server = spawn(process.execPath, ['--import', 'tsx', '--eval', `
-      const { createApp } = require('./src/index.ts')
+      const { createApp } = require('./src/app.ts')
       const server = createApp({ clickhouseUrl: process.env.CLICKHOUSE_TEST_URL, statementTimeoutMs: 2000 })
         .listen(0, '127.0.0.1', () => console.log('STAGE2_API=' + server.address().port))
     `], {
