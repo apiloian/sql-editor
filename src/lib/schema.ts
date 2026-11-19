@@ -1,4 +1,4 @@
-import { executeQuery } from './query'
+import { executeQuery } from './query-api'
 
 export type DatabaseTable = { name: string; engine: string }
 export type TableReference = DatabaseTable & { database: string }

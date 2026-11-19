@@ -1,5 +1,7 @@
 # Implementation decisions
 
+- 2026-11-18. Keep the shared query result types and row limit in `query.ts`. Browser query requests live in `query-api.ts` so Express can read the shared limit without loading Vite's environment configuration.
+
 - 2026-11-18. The browser reads `VITE_APP_API_BASE` at build time and appends the query, assistant, and CSV routes in one request helper. The base can include a path prefix. Vite no longer proxies API traffic. The API host owns CORS when it runs on a different origin.
 
 - 2026-11-18. Stage 5 keeps ECharts and uses the selected statement's complete ordered row result. The chart suggests a category and prefers typed numeric measures, while letting users choose any category and any plottable measure. Axis titles capitalize the first letter of the selected field. Bar zoom uses a horizontal range slider and a reset button. Pie uses ten theme colors, repeats them in result order, and gives each slice, connector, and tooltip marker the same color. Hover keeps the selected label prominent and fades the other slices, labels, and connectors together. Number formatting, legend placement, and zoom on other chart types remain open.
