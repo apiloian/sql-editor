@@ -9,6 +9,8 @@ import { useVoiceTranscript } from '../../hooks/useVoiceTranscript'
 import './assistant-composer.css'
 
 const MAX_PROMPT_LENGTH = 4_000
+const NGROK_HOST = /(^|\.)ngrok(?:-free)?\.(?:app|dev|io)$/i
+const NGROK_HEADERS = { 'ngrok-skip-browser-warning': '1' }
 
 type ComposerProps = AssistantTurnOptions & { enabled: boolean }
 
@@ -23,9 +25,8 @@ export function AssistantComposer(props: ComposerProps) {
       </div>
     </div>
   }
-  return <CopilotKitProvider runtimeUrl={runtimeUrl} agentId={ASSISTANT_AGENT_ID} useSingleEndpoint={false} enableInspector={false} showDevConsole={false} headers={{
-    'ngrok-skip-browser-warning': 'true',
-  }}>
+  const ngrok = URL.canParse(runtimeUrl) && NGROK_HOST.test(new URL(runtimeUrl).hostname)
+  return <CopilotKitProvider runtimeUrl={runtimeUrl} agentId={ASSISTANT_AGENT_ID} useSingleEndpoint={false} enableInspector={false} showDevConsole={false} headers={ngrok ? NGROK_HEADERS : undefined}>
     <AssistantConversation {...props} />
   </CopilotKitProvider>
 }
